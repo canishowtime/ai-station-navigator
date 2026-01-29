@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+
+# Node
+dist/
+node_modules/
+
+# IDE
+.idea/
+.vs/
+*.swp
+*.swo
+*.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Runtime
+*.log
+*.db
+*.sqlite
+*.pid
+nul
+
+# Claude runtime
+**/.claude/memory/*.log
+**/.claude/skills/*

@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(./)",
+      "Write(./mybox/*)",
+      "Edit(./mybox/*)",
+      "Glob(./)",
+      "Grep(./)",
+      "WebSearch",
+      "WebFetch",
+      "Bash(git:status,git:log,git:diff,git:show,git:branch*)",
+      "Bash(rd /s /q mybox\\temp)",
+      "Bash(rd /s /q mybox\\unpacked_doc)",
+      "Bash(rd /s /q mybox\\workspace\\current\\worker_demo)",
+      "Bash(rd /s /q mybox\\workspace\\current\\mybox)",
+      "Bash(del mybox\\cleanup.bat)",
+      "Bash(del mybox\\add_text.py)",
+      "Bash(del mybox\\workspace\\current\\plan.json)",
+      "Bash(del mybox\\workspace\\outputs\\test*.txt)",
+      "Bash(python bin/skill_manager.py info:*)",
+      "Bash(python:*)",
+      "Bash(findstr:*)",
+      "Bash(dir:*)"
+    ],
+    "deny": [
+      "Write(./)",
+      "Edit(./)",
+      "Write(./mybox/../*)",
+      "Edit(./mybox/../*)",
+      "Read(C:/*)",
+      "Write(C:/*)",
+      "Read(C:/Windows/*)",
+      "Read(C:/Program Files/*)",
+      "Write(C:/Users/*/.ssh/*)",
+      "Write(C:/Users/*/.claude/*)",
+      "Write(C:/Users/*/AppData/*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "context7"
+  ]
+}

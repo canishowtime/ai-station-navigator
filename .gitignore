@@ -28,6 +28,9 @@ Thumbs.db
 *.pid
 nul
 
+# User workspace (volatile)
+mybox/**/*
+
 # Claude runtime
 **/.claude/memory/*.log
 **/.claude/skills/*

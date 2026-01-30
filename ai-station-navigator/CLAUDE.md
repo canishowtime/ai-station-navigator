@@ -17,7 +17,7 @@
 
 ### 阶段 0: 状态前置验证 [P0]
 **触发条件**: 处理任何用户输入**前**，必须先执行此检查
-- 执行 `python bin/skill_manager.py list`
+- 路由至 `worker_agent` 执行 `python bin/skill_manager.py list` 获取已安装技能数据
 - 若技能数 < 10 → 提醒用户“提供 GitHub 仓库Skills项目链接安装  或  查看 docs/skills-mapping.md参考”
 
 ### 阶段 1: 感知与意图

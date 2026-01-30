@@ -133,7 +133,7 @@
 | :--- | :--- |
 | `humanizer-zh` | **去 AI 味**：去除 AI 生成痕迹的中文文本优化工具 |
 
-### 📦 [ginobefun/deep-reading-analyst](https://github.com/ginobefun/deep-reading-analyst-skill)
+### 📦 [ginobefun/deep-reading-analyst-skill](https://github.com/ginobefun/deep-reading-analyst-skill)
 | 技能 | 功能 |
 | :--- | :--- |
 | `deep-reading-analyst` | **深度阅读**：文章/论文/书籍的深度分析框架 |
@@ -182,7 +182,7 @@
 | `obsidian-bases` | Obsidian Bases 数据库操作 (视图/过滤器) |
 | `obsidian-markdown` | Obsidian 风格 Markdown (双链/嵌入) |
 
-### 📦 [axtonliu/axton-obsidian-visual](https://github.com/axtonliu/axton-obsidian-visual-skills)
+### 📦 [axtonliu/axton-obsidian-visual-skills](https://github.com/axtonliu/axton-obsidian-visual-skills)
 | 技能 | 功能 |
 | :--- | :--- |
 | `excalidraw-diagram` | Excalidraw 图表生成 (流程图/思维导图) |

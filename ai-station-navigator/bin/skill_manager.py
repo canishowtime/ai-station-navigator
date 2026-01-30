@@ -42,6 +42,11 @@ from urllib.parse import urlparse
 import tempfile
 import yaml
 
+# 添加项目 lib 目录到 sys.path（绿色包预置依赖）
+_lib_dir = Path(__file__).parent.parent / "lib"
+if _lib_dir.exists():
+    sys.path.insert(0, str(_lib_dir))
+
 # TinyDB for database operations
 try:
     from tinydb import TinyDB, Query
@@ -1434,6 +1439,10 @@ class QuickFetcher:
         self.branch = branch
         self.raw_base = "https://raw.githubusercontent.com"
         self.proxies = get_raw_proxies()
+        # 优化: 文件内容缓存
+        self._cache = {}
+        # 优化: 记录可用代理（首次成功后优先使用）
+        self._working_proxy = None
 
     def fetch_file(self, file_path: str) -> Optional[str]:
         """
@@ -1445,48 +1454,60 @@ class QuickFetcher:
         Returns:
             文件内容字符串，失败返回 None
         """
+        # 优化: 检查缓存
+        if file_path in self._cache:
+            return self._cache[file_path]
+
         path = f"{self.repo}/{self.branch}/{file_path}"
 
-        # 1. 尝试加速器
+        # 1. 优先使用已知可用代理
+        if self._working_proxy:
+            proxy_url = self._working_proxy.replace("{path}", path)
+            content = self._try_fetch(proxy_url, file_path)
+            if content is not None:
+                self._cache[file_path] = content
+                return content
+            # 可用代理失效，重置
+            self._working_proxy = None
+
+        # 2. 尝试加速器列表
         for proxy_template in self.proxies:
             proxy_url = proxy_template.replace("{path}", path)
-            try:
-                result = subprocess.run(
-                    ["curl", "-s", "--max-time", "30", proxy_url],
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    check=False
-                )
-                if result.returncode == 0 and result.stdout:
-                    content = result.stdout
-                    # 检查 404
-                    if not content or "404: Not Found" in content or "<title>404" in content:
-                        continue
-                    return content
-            except Exception:
-                continue
+            content = self._try_fetch(proxy_url, file_path)
+            if content is not None:
+                # 记录可用代理
+                self._working_proxy = proxy_template
+                self._cache[file_path] = content
+                return content
 
-        # 2. 回退到原始地址
+        # 3. 回退到原始地址
         raw_url = f"{self.raw_base}/{path}"
+        content = self._try_fetch(raw_url, file_path, is_fallback=True)
+        if content is not None:
+            self._cache[file_path] = content
+            return content
+
+        return None
+
+    def _try_fetch(self, url: str, file_path: str, is_fallback: bool = False) -> Optional[str]:
+        """尝试从指定 URL 获取文件"""
         try:
             result = subprocess.run(
-                ["curl", "-s", "--max-time", "30", raw_url],
+                ["curl", "-s", "--max-time", "30", url],
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
                 check=False
             )
-            if result.returncode == 0:
+            if result.returncode == 0 and result.stdout:
                 content = result.stdout
+                # 检查 404
                 if not content or "404: Not Found" in content or "<title>404" in content:
                     return None
                 return content
-        except Exception as e:
-            if "404" not in str(e):
-                warn(f"获取文件失败 {file_path}: {e}")
+        except Exception:
+            pass
 
         return None
 
@@ -1547,17 +1568,15 @@ class RemoteSkillAnalyzer:
                 break
 
         if not found_branch:
-            # 尝试通过目录结构判断
-            self.fetcher = QuickFetcher(self.repo, "main")
-            tree = self._get_tree_structure()
-            if tree:
-                found_branch = "main"
-            else:
-                # 尝试 master
-                self.fetcher = QuickFetcher(self.repo, "master")
-                tree = self._get_tree_structure()
-                if tree:
-                    found_branch = "master"
+            # 优化: 缓存目录树结果，避免重复调用
+            tree_cache = {}
+            for branch in ["main", "master"]:
+                if branch not in tree_cache:
+                    self.fetcher = QuickFetcher(self.repo, branch)
+                    tree_cache[branch] = self._get_tree_structure()
+                if tree_cache[branch]:
+                    found_branch = branch
+                    break
 
         if not found_branch:
             return result
@@ -2973,37 +2992,75 @@ def main():
         analyzer = RemoteSkillAnalyzer(repo)
         result = analyzer.analyze()
 
-        # 5. 输出报告
+        # 5. 收集输出内容
+        output_lines = []
+        output_lines.append("=" * 60)
+        output_lines.append(f"📊 技能仓库分析: {repo}")
+        output_lines.append("=" * 60)
+        output_lines.append("")
+
+        skills = result.get("skills", [])
+        if not skills:
+            output_lines.append(f"⚠️ 未找到技能")
+            output_lines.append(f"\n提示: 访问 https://github.com/{repo} 查看仓库")
+        else:
+            if len(skills) == 1:
+                output_lines.append(f"找到 1 个技能:")
+            else:
+                output_lines.append(f"找到 {len(skills)} 个技能:")
+            output_lines.append("")
+
+            for i, skill in enumerate(skills, 1):
+                name = skill.get("name", "unknown")
+                category = skill.get("category", "utilities")
+                description = skill.get("description", "无描述")
+                skill_url = skill.get("url", f"https://github.com/{repo}")
+
+                output_lines.append(f"{i}. **{name}**")
+                output_lines.append(f"   - 分类: {category}")
+                output_lines.append(f"   - 描述: {description}")
+                output_lines.append(f"   - 安装: `{skill_url}`")
+                output_lines.append("")
+
+        output_lines.append("=" * 60)
+        output_lines.append("提示: 复制链接到浏览器查看，或使用命令安装")
+        output_lines.append("=" * 60)
+
+        # 6. 输出到终端
         print(f"\n{Colors.HEADER}{'='*60}{Colors.ENDC}")
         print(f"{Colors.HEADER}📊 技能仓库分析: {repo}{Colors.ENDC}")
         print(f"{Colors.HEADER}{'='*60}{Colors.ENDC}\n")
 
-        skills = result.get("skills", [])
         if not skills:
             warn(f"未找到技能")
             print(f"\n提示: 访问 {Colors.OKCYAN}https://github.com/{repo}{Colors.ENDC} 查看仓库")
-            return 0
-
-        if len(skills) == 1:
-            print(f"找到 1 个技能:\n")
         else:
-            print(f"找到 {len(skills)} 个技能:\n")
+            for i, skill in enumerate(skills, 1):
+                name = skill.get("name", "unknown")
+                category = skill.get("category", "utilities")
+                description = skill.get("description", "无描述")
+                skill_url = skill.get("url", f"https://github.com/{repo}")
 
-        for i, skill in enumerate(skills, 1):
-            name = skill.get("name", "unknown")
-            category = skill.get("category", "utilities")
-            description = skill.get("description", "无描述")
-            url = skill.get("url", f"https://github.com/{repo}")
-
-            print(f"  {Colors.OKGREEN}{i}.{Colors.ENDC} {Colors.BOLD}{name}{Colors.ENDC}")
-            print(f"     分类: {category}")
-            desc_short = description[:60] + "..." if len(description) > 60 else description
-            print(f"     描述: {desc_short}")
-            print(f"     建议安装链接: {Colors.OKCYAN}{url}{Colors.ENDC}\n")
+                print(f"  {Colors.OKGREEN}{i}.{Colors.ENDC} {Colors.BOLD}{name}{Colors.ENDC}")
+                print(f"     分类: {category}")
+                desc_short = description[:60] + "..." if len(description) > 60 else description
+                print(f"     描述: {desc_short}")
+                print(f"     建议安装链接: {Colors.OKCYAN}{skill_url}{Colors.ENDC}\n")
 
         print(f"{Colors.HEADER}{'='*60}{Colors.ENDC}")
         print(f"{Colors.WARNING}提示: 复制链接到浏览器查看，或使用命令安装{Colors.ENDC}")
         print(f"{Colors.HEADER}{'='*60}{Colors.ENDC}")
+
+        # 7. 保存到文件 (默认行为)
+        reports_dir = BASE_DIR / "mybox" / "reports"
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        safe_repo_name = repo.replace("/", "_")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_file = reports_dir / f"{safe_repo_name}_技能列表_{timestamp}.md"
+
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write("\n".join(output_lines))
+        success(f"报告已保存: {output_file}")
 
         return 0
 

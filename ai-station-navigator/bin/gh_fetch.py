@@ -19,6 +19,11 @@ import sys
 import subprocess
 from pathlib import Path
 
+# 添加项目 lib 目录到 sys.path（绿色包预置依赖）
+_lib_dir = Path(__file__).parent.parent / "lib"
+if _lib_dir.exists():
+    sys.path.insert(0, str(_lib_dir))
+
 # =============================================================================
 # 配置加载
 # =============================================================================

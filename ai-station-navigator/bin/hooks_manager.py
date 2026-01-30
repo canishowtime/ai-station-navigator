@@ -272,6 +272,17 @@ class HooksManager:
             save_state=False
         )
 
+        # Hook 6: 会话开始时获取技能数据
+        self.register_hook(
+            Hook(
+                name="refresh_skills_on_start",
+                hook_type=HookType.ON_SESSION_START,
+                description="会话开始时自动刷新技能数据",
+                action=self._action_refresh_skills
+            ),
+            save_state=False
+        )
+
         # Note: 技能安装/卸载的数据库同步已移至 skill_manager.py
         # 移除了 sync_skill_install_status 和 sync_skill_uninstall_status Hooks
 

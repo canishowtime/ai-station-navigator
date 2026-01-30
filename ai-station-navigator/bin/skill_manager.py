@@ -2464,7 +2464,8 @@ def main():
     uninstall_parser = subparsers.add_parser("uninstall", help="卸载技能并同步数据库状态")
     uninstall_parser.add_argument(
         "name",
-        help="技能名称"
+        nargs="+",
+        help="技能名称（支持多个，空格分隔）"
     )
     uninstall_parser.add_argument(
         "--force", "-f",
@@ -2729,38 +2730,67 @@ def main():
     elif args.command == "uninstall":
         header("技能卸载器")
 
-        skill_name = args.name
-        skill_dir = CLAUDE_SKILLS_DIR / skill_name
+        skill_names = args.name
+        success_count = 0
+        failed_list = []
 
-        # 1. 检查技能是否存在
-        if not skill_dir.exists():
-            error(f"技能不存在: {skill_name}")
+        # 遍历每个技能
+        for skill_name in skill_names:
+            # 1. 通过 name 查找 folder_name
+            folder_name = None
+            if TINYDB_AVAILABLE:
+                try:
+                    db, Skill = SkillInstaller._init_db()
+                    if db:
+                        result = db.get(Skill.name == skill_name)
+                        if result:
+                            folder_name = result.get("folder_name")
+                except Exception:
+                    pass
+
+            # 2. 如果找不到 folder_name，尝试直接用输入作为 folder_name
+            if not folder_name:
+                folder_name = skill_name
+
+            skill_dir = CLAUDE_SKILLS_DIR / folder_name
+
+            # 3. 检查技能是否存在
+            if not skill_dir.exists():
+                error(f"技能不存在: {skill_name} (查找目录: {folder_name})")
+                failed_list.append(skill_name)
+                continue
+
+            # 4. 确认删除
+            if not args.force:
+                print(f"{Colors.WARNING}即将删除技能: {skill_name}{Colors.ENDC}")
+                print(f"路径: {skill_dir}")
+                print(f"{Colors.OKGREEN}正在删除...{Colors.ENDC}")
+
+            # 5. 删除目录（原子操作：文件 + 数据库）
+            try:
+                # 5.1 删除文件
+                shutil.rmtree(skill_dir)
+
+                # 5.2 从数据库移除（使用 folder_name）
+                db_remove_success = SkillInstaller._remove_skill_from_db(folder_name)
+                if db_remove_success:
+                    success(f"已删除: {skill_name} (数据库已同步)")
+                    success_count += 1
+                else:
+                    # 数据库操作失败，文件已删除但数据库未更新
+                    warn(f"文件已删除，但数据库同步失败: {skill_name}")
+                    success_count += 1
+            except Exception as e:
+                error(f"删除失败: {skill_name} - {e}")
+                failed_list.append(skill_name)
+
+        # 汇总结果
+        print()
+        info(f"批量删除完成: 成功 {success_count}/{len(skill_names)}")
+        if failed_list:
+            error(f"失败: {', '.join(failed_list)}")
             return 1
-
-        # 2. 确认删除
-        if not args.force:
-            print(f"{Colors.WARNING}即将删除技能: {skill_name}{Colors.ENDC}")
-            print(f"路径: {skill_dir}")
-            # 简单确认（非交互环境默认确认）
-            print(f"{Colors.OKGREEN}正在删除...{Colors.ENDC}")
-
-        # 3. 删除目录（原子操作：文件 + 数据库）
-        try:
-            # 3.1 删除文件
-            shutil.rmtree(skill_dir)
-
-            # 3.2 从数据库移除
-            db_remove_success = SkillInstaller._remove_skill_from_db(skill_name)
-            if db_remove_success:
-                success(f"已删除: {skill_name} (数据库已同步)")
-            else:
-                # 数据库操作失败，文件已删除但数据库未更新
-                warn(f"文件已删除，但数据库同步失败: {skill_name}")
-
-            return 0
-        except Exception as e:
-            error(f"删除失败: {e}")
-            return 1
+        return 0
 
     elif args.command == "install":
         header("技能安装器")

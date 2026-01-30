@@ -3,15 +3,26 @@
 
 <br>
 
+<div align="center">
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Engine: Claude Code](https://img.shields.io/badge/Engine-Claude--Code-blue)](https://anthropic.com)
-[![Python: 3.8+](https://img.shields.io/badge/Python-3.8+-green)](https://python.org)
+[![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)](https://microsoft.com)
+[![Release](https://img.shields.io/github/v/release/YOUR_USERNAME/YOUR_REPO_NAME?label=Release&color=blue)](https://github.com/YOUR_USERNAME/YOUR_REPO_NAME/releases)
+
+[![Python](https://img.shields.io/badge/Python-3.8%2B_(Portable)-3776AB?logo=python&logoColor=white)](https://python.org)
+[![Node.js](https://img.shields.io/badge/Node.js-Bundled-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![Git](https://img.shields.io/badge/Git-Embedded-F05032?logo=git&logoColor=white)](https://git-scm.com)
+
+[![Powered By](https://img.shields.io/badge/Powered%20By-Windows%20Terminal-4D4D4D?logo=windows-terminal&logoColor=white)](https://github.com/microsoft/terminal)
+[![Claude Code](https://img.shields.io/badge/Integration-Claude%20Code-D97757?logo=anthropic&logoColor=white)](https://anthropic.com)
+
+</div>
 
 <br>
 
-**AI Station Navigator** 是一款基于 Claude Code 引擎构建的模块化 AI 工作站。它模仿计算机组成原理，将繁杂的 AI 任务精准路由至隔离的子智能体（Sub-Agents）执行。项目集成了沙盒化执行环境与“应用商店式”技能管理，配合全绿色的免安装运行环境，旨在为用户提供一个“解压即用”、性能恒定、无限扩展的个人 AI 智慧中枢。
+**AI Station Navigator** 是一款基于 Claude Code 引擎构建的模块化 AI 工作站。它模仿计算机组成原理，将繁杂的 AI 任务路由至子智能体（Sub-Agents）内并匹配相应的skills执行。项目集成了“应用商店式”技能管理与沙盒化执行环境，配合全绿色的免安装运行环境，旨在为用户提供一个“解压即用”、性能稳定、无限扩展的个人 AI 智慧中枢。
 
-**✅ 模块化架构 | ✅ 沙盒隔离 | ✅ 零预装 | ✅ 应用商店式技能管理**
+** ✅ 智能体 Context 优化 | ✅ 应用商店式技能管理 | ✅ 体验良好的UI | ✅ 沙盒隔离 | ✅ 零预装绿色环境 | ✅ 模块化架构**
 
 ---
 
@@ -27,7 +38,7 @@
 | **系统进程/线程** | **Sub-Agents (worker/skills)** | **任务执行层**：子智能体隔离运行，**减少对主智能体上下文污染**。 |
 | **系统驱动 (Drivers)** | **MCP + Hooks** | **扩展与自动化**：MCP 提供外部资源交互驱动；Hooks 驱动系统自动化管理（日志/空间/状态）。 |
 | **应用程序 (Apps)** | **Skills (GitHub 技能仓)** | **功能插件层**：通过 GitHub 链接实现“应用商店式”的一键安装与调用。 |
-| **集成环境 (Runtime)** | **Portable Environment** | **底层支撑**：预集成绿色版 Python, Node.js, Git强力底层工具，确保环境高度统一，增强潜在扩展能力。 |
+| **集成环境 (Runtime)** | **Portable Environment** | **底层支撑**：预集成绿色版 Python, Node.js, Git，Windows terminal强力底层工具，确保环境高度统一，增强潜在扩展能力。 |
 
 ---
 
@@ -35,18 +46,19 @@
 
 * 🧠 **内核调度系统 (Kernel)**
 * 意图识别：用CLAUDE.md作为指令集，自动判断任务类型并路由至对应处理器。
-* 会话隔离：子智能体独立运行，保护主对话 Context 不被冗余数据淹没。
-
+* 会话隔离：通过任务分流，子智能体独立运行，保护主对话 Context 不被冗余数据淹没。
 
 * 🔧 **应用商店式技能管理 (Skills)**
 * **零预装设计**：项目本身不内置功能，用户按需从 GitHub 安装技能。
 * **一键安装**：支持通过 GitHub 仓库链接直接下载、校验并注册技能。
 * **多格式兼容**：支持 SKILL.md、Claude Plugin、Cursor Rules 等。
+* **搭建基础工作流**：通过任务拆解和用户指令，系统支持将多个技能组合成一个任务工作流执行。
 
+* �🖥️ **优化终端UI体验**
+* 沉浸式交互终端：基于现代终端技术构建的可视化命令行界面，兼顾专业感与易用性。
 
 * 🔌 **系统扩展与驱动 (MCP & Hooks)**
 * **MCP 资源驱动**：通过 Model Context Protocol 接入实时搜索、数据库、本地文件等。
-
 
 * 🛡️ **沙盒化执行环境**
 * 严格权限控制：设定内核只读范围，子智能体写入范围，用户自行判断和控制权限。

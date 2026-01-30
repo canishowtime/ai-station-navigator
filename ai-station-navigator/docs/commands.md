@@ -10,12 +10,14 @@
 | Intent | Command Signature | Note |
 |:---|:---|:---|
 | **Install** | `skill_manager.py install <src>` | 支持 URL/Path/Name |
-| **Uninstall** | `skill_manager.py uninstall <name>` | **Sync DB Auto** |
+| **Uninstall** | `skill_manager.py uninstall <name> [...]` | **Sync DB Auto, 支持批量** |
 | **List** | `skill_manager.py list` | 查看已装技能 |
 | **Search** | `skill_manager.py search <kw>` | 见 CLAUDE.md 协议 |
 | **Info** | `skill_manager.py info <repo>` | 分析远程仓库（不克隆） |
 | **Create** | `skill_creator.py init <name>` | 初始化模板 |
 | **Validate** | `skill_creator.py validate <path>` | 格式校验 |
+| **Match** | `skill_matcher.py <task> [-t THRESHOLD] [-k TOP]` | 技能匹配搜索 |
+| **Sync** | `skill_matcher.py --sync` | 同步已安装技能到数据库 |
 
 ## 2. 系统改进 (Improvements)
 **Base**: `python bin/improvement_manager.py`
@@ -38,15 +40,34 @@
 - **Test**: `test <name>`
 - **Presets**: `context7`, `tavily`, `filesystem`, `github`, `sqlite`, `memory`
 
-## 4. 自动挂钩 (Auto Hooks)
-*系统自动触发，无需手动调用*
+## 4. 钩子管理 (Hooks)
+**Base**: `python bin/hooks_manager.py`
 
+- **Execute**: `execute [--hook-type <type>] [--force]`
+- **Trigger**: `trigger --hook-name <name>`
+- **List**: `list`
+- **Enable**: `enable --hook-name <name>`
+- **Disable**: `disable --hook-name <name>`
+
+**Auto Hooks** (系统自动触发):
 - `log_rotate` (Session Start)
 - `check_disk_space` (Session Start)
 - `cleanup_workspace` (Delivery)
 - `sync_skill_status` (Post-Install/Uninstall)
 
-## 5. 文件系统权限 (FS Map)
+## 5. 文件编辑 (File Editor)
+**Base**: `python bin/file_editor.py`
+
+- **Replace**: `replace <file> <old> <new>`
+- **Regex**: `regex <file> <pattern> <replacement> [count=0]`
+- **Append**: `append <file> <content>`
+- **Prepend**: `prepend <file> <content>`
+- **Insert After**: `insert-after <file> <marker> <content>`
+- **Insert Before**: `insert-before <file> <marker> <content>`
+- **Delete Between**: `delete-between <file> <start_marker> <end_marker>`
+- **Update JSON**: `update-json <file> <field_path> <value>`
+
+## 6. 文件系统权限 (FS Map)
 
 | Zone | Path | Permission | Role |
 |:---|:---|:---|:---|
@@ -55,7 +76,7 @@
 | **Work** | `mybox/` | ⚡ **Free R/W** | 唯一的沙盒环境 |
 | **Output** | `delivery/` | 🟢 **Write-Once** | 最终交付物 |
 
-## 6. 外部访问协议 (Ext. Access)
+## 7. 外部访问协议 (Ext. Access)
 
 ### GitHub Protocol
 ⚠️ **STRICT RULE**: 禁止直接 `git clone` 或 `curl`。必须经过加速器/解析器。
@@ -65,5 +86,5 @@
 | **DB Import** | `python bin/skills_db_sync.py --import <json>` |
 | **Get File** | `python bin/gh_fetch.py raw <user/repo/branch/path>` |
 
-**Last Updated**: 2026-01-28
-**Ver**: v5.2 (Opt)
+**Last Updated**: 2026-01-30
+**Ver**: v5.3 (Add: hooks_manager, file_editor, skill_matcher)

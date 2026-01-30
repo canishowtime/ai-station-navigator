@@ -101,3 +101,28 @@ Kernel 意图 -> Worker 执行指令：
   - 禁止静默执行（只跑脚本不报结果）。
   - 禁止自行修改代码（只运行，不编辑）。
   - 禁止直接操作 SQL（针对 JSON DB）。
+
+## 7. 文件编辑工具 (无闪烁)
+
+为避免 Edit 工具预览导致的终端闪烁，使用 `file_editor.py` 进行文件修改：
+
+### 调用方式
+```bash
+python bin/file_editor.py <operation> [args...]
+```
+
+### 常用操作
+| 操作 | 命令 | 说明 |
+|:---|:---|:---|
+| 替换 | `replace <file> <old> <new>` | 精确字符串替换 |
+| 追加 | `append <file> <content>` | 文件末尾追加 |
+| 插入 | `insert-after <file> <marker> <content>` | 标记后插入 |
+| 正则 | `regex <file> <pattern> <replacement>` | 正则替换 |
+| JSON | `update-json <file> <field_path> <value>` | 更新 JSON 字段 |
+
+### 使用场景
+- 更新数据库文件（.db）
+- 记录执行日志
+- 汇总统计结果
+
+**注意**: 此工具无预览确认，适用于数据文件。

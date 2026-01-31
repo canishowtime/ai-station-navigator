@@ -95,7 +95,6 @@ ai-station-navigator/
 
 * **查看能力**：`你现在有哪些技能？`
 * **安装应用**：`安装技能：https://github.com/xxx/repo   （自动执行安装，如果主项目是技能包，建议地址路径正确指示到你需要单个技能，否则会安装整个技能包）
-* **分析应用**：分析技能：https://github.com/xxx/repo   （自动执行分析，并反馈分析结果和安装建议）
 * **使用应用**： `@技能  需求内容`  （自动分析需求匹配已安装技能，确认后可立即执行并返回执行结果）
 * **卸载应用**：`卸载技能：https://github.com/xxx/repo  或  xxx/repo`
 * **尝试创建skills工作流**：`参考 docs\skills-mapping.md 设计一个包含x步的工作流，以流程xx,xx,xx,xx...为准，可以用在xxxx场景`

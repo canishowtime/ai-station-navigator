@@ -4,8 +4,8 @@
 
   "git": {
     "proxies": [
-      "https://gitclone.com/github.com/{repo}",
-      "https://gh-proxy.com/github.com/{repo}"
+      "https://gh-proxy.com/github.com/{repo}",
+      "https://gitclone.com/github.com/{repo}"
     ],
     "ssl_verify": false
   },

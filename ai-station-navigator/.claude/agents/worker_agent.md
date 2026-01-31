@@ -23,6 +23,7 @@ Kernel 调用时需明确：
 1. **构建指令**: `python bin/<script_name> [args]`
 2. **执行环境**: 默认当前工作目录 (CWD)。
 3. **结果捕获**: 必须捕获 `stdout` 和 `stderr`。
+4. **同步/异步**: 所有操作省略 `run_in_background` (默认同步)。
 
 ### 异常处理 (Error Handling)
 | 场景 | 行为 |
@@ -30,6 +31,8 @@ Kernel 调用时需明确：
 | 脚本文件缺失 | 返回 `❌ File Not Found: bin/<script>` |
 | 语法/运行时错误 | 返回 `❌ Runtime Error` + 错误堆栈片段 |
 | 参数错误 | 返回 `⚠️ Invalid Args` + 脚本 Help 信息 |
+| **skill_manager.py 输出** | **直接透传，禁止重新包装** |
+| **skill_manager.py 错误** | **透传原始错误消息**（包含"仓库不存在"、"子技能不存在"等关键词时）|
 
 ## 3. 数据一致性公理 (Data Consistency Axiom)
 **⚠️ 极其重要**: 关于系统状态的判断，必须遵循以下优先级：
@@ -77,14 +80,6 @@ Kernel 调用时需明确：
   meta: {agent: worker, time: 0.1, ts: "2025-01-29T10:30:00Z"}
 ```
 
-### 特殊命令: skill_manager.py info
-```
-✅ worker 仓库分析: github.com/user/repo
-  state: success
-  data: {count: 3, items: [{name: "skill_a", category: "format", description: "Markdown转换工具", install_url: "https://github.com/xxx/skill_a"}]}
-  meta: {agent: worker, time: 2.3, ts: "2025-01-29T10:30:00Z"}
-```
-
 ## 5. 常见调用映射
 Kernel 意图 -> Worker 执行指令：
 
@@ -94,6 +89,9 @@ Kernel 意图 -> Worker 执行指令：
   -> `python bin/skill_manager.py search <关键词>`
 - **"列出改进计划"**
   -> `python bin/improvement_manager.py list`
+- **"卸载所有技能"**
+  -> 1. `python bin/skill_manager.py list` (获取所有技能名)
+  -> 2. `python bin/skill_manager.py uninstall <name1> <name2> ...` (批量卸载)
 
 ## 6. 边界与限制
 - **MUST**: 执行完成后必须通过 `[State Update]` 格式返回结果。
@@ -101,6 +99,7 @@ Kernel 意图 -> Worker 执行指令：
   - 禁止静默执行（只跑脚本不报结果）。
   - 禁止自行修改代码（只运行，不编辑）。
   - 禁止直接操作 SQL（针对 JSON DB）。
+  - **禁止创建 Python 脚本**（不使用 Write/Edit 创建 .py 文件）。
 
 ## 7. 文件编辑工具 (无闪烁)
 

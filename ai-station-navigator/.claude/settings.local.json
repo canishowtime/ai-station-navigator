@@ -17,7 +17,6 @@
       "Bash(del mybox\\add_text.py)",
       "Bash(del mybox\\workspace\\current\\plan.json)",
       "Bash(del mybox\\workspace\\outputs\\test*.txt)",
-      "Bash(python bin/skill_manager.py info:*)",
       "Bash(python:*)",
       "Bash(findstr:*)",
       "Bash(dir:*)"

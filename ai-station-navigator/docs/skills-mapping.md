@@ -251,11 +251,6 @@
 
 ## 七、专业领域
 
-### zh-xx/legal-assistant-skills
-| 子技能名称 | 说明 |
-|:---|:---|
-| `contract-review` | 合同审查与风险标注 |
-
 ### alirezarezvani/claude-skills
 企业级团队技能矩阵（43 个技能，覆盖 Engineering/RA/QM/Product/C-Level/Marketing）
 

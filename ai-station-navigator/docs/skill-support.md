@@ -102,8 +102,8 @@ def _convert_new_format(source: Path, target: Path) -> None:
 ## 测试
 
 ```bash
-# 测试格式检测
-python bin/skill_manager.py convert path/to/skill
+# 安装并测试
+python bin/skill_manager.py install path/to/skill
 
 # 验证结果
 python bin/skill_manager.py validate .claude/skills/skill-name

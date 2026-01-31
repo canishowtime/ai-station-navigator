@@ -45,7 +45,7 @@ description: <技能描述>
    - **Input**: 用户提供的内容或文件路径
    - **Output**: 默认指向 `mybox/output/` (除非明确指定)
    - **Param Check**: 校验 `required: true` 的参数是否缺失
-3. 使用 `Bash` 执行最终构建的命令
+3. 使用 `Bash` 执行最终构建的命令（省略 `run_in_background`，默认同步）
 4. **超时约束**: 单次执行 ≤ 60秒
 5. 执行成功后记录: `python bin/skill_manager.py record <skill_name>`
 

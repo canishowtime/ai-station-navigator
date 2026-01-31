@@ -146,6 +146,10 @@ class SkillMatcher:
                     f"数据库不存在: {self.db_path}\n"
                     f"请先运行: python bin/skills_db_init.py"
                 )
+            if not HAS_TINYDB:
+                raise ImportError(
+                    "TinyDB 未安装，请运行: pip install tinydb"
+                )
             self._db = TinyDB(self.db_path, storage=JSONStorage)
             self._Skill = Query()
         return self._db

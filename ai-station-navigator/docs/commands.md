@@ -7,13 +7,14 @@
 ## 1. 技能域 (Skill & Scan)
 **Base**: `python bin/`
 
+⚠️ **禁止 Kernel 直接调用** → 必须通过 `worker_agent` 派发 (CLAUDE.md:232)
+
 | Intent | Command Signature | Note |
 |:---|:---|:---|
 | **Install** | `skill_manager.py install <src>` | 支持 URL/Path/Name |
 | **Uninstall** | `skill_manager.py uninstall <name> [...]` | **Sync DB Auto, 支持批量** |
 | **List** | `skill_manager.py list` | 查看已装技能 |
 | **Search** | `skill_manager.py search <kw>` | 见 CLAUDE.md 协议 |
-| **Info** | `skill_manager.py info <repo>` | 分析远程仓库（不克隆） |
 | **Create** | `skill_creator.py init <name>` | 初始化模板 |
 | **Validate** | `skill_creator.py validate <path>` | 格式校验 |
 | **Match** | `skill_matcher.py <task> [-t THRESHOLD] [-k TOP]` | 技能匹配搜索 |
@@ -33,6 +34,8 @@
 
 ## 3. MCP 资源 (MCP Server)
 **Base**: `python bin/mcp_manager.py`
+
+⚠️ **禁止 Kernel 直接调用** → 必须通过 `mcp_agent` 派发 (CLAUDE.md:31)
 
 - **List**: `list`
 - **Add**: `add <name> [--env K=V] [-i]`

@@ -232,7 +232,7 @@ python -c "from tinydb import TinyDB; db=TinyDB('.claude/skills/skills.db',encod
 
 ### `github` - GitHub 扫描
 
-从 GitHub 仓库获取的记录（已弃用 scanner，改用 skill_manager.py info）。
+从 GitHub 仓库获取的记录（通过 skill_manager.py install 安装时自动提取）。
 
 **特征**：
 - 包含完整的 `repo`、`stars` 信息

@@ -132,9 +132,6 @@ python bin/skill_manager.py install <source>
 
 # 搜索技能 (智能匹配)
 python bin/skill_matcher.py match <keyword>
-
-# 查看远程仓库内容 (不克隆)
-python bin/skill_manager.py info <repo>
 ```
 
 ### 4. MCP 服务器管理

@@ -7,7 +7,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)](https://microsoft.com)
-[![Release](https://img.shields.io/github/v/release/YOUR_USERNAME/YOUR_REPO_NAME?label=Release&color=blue)](https://github.com/YOUR_USERNAME/YOUR_REPO_NAME/releases)
+[![Release](https://img.shields.io/github/v/release/YOUR_USERNAME/YOUR_REPO_NAME?label=Release&color=blue)](https://github.com/canishowtime/ai-station-navigator/releases)
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B_(Portable)-3776AB?logo=python&logoColor=white)](https://python.org)
 [![Node.js](https://img.shields.io/badge/Node.js-Bundled-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
@@ -34,35 +34,26 @@
 
 | 物理组件 | 软件映射 | 角色功能描述 |
 | --- | --- | --- |
-| **中央处理器 (CPU)** | **Claude Code + CLAUDE.md + LLM** | **核心逻辑层**：负责能力驱动、意图识别、指令调度、任务拆解与上下文管理。 |
-| **系统进程/线程** | **Sub-Agents (worker/skills)** | **任务执行层**：子智能体隔离运行，**减少对主智能体上下文污染**。 |
-| **系统驱动 (Drivers)** | **MCP + Hooks** | **扩展与自动化**：MCP 提供外部资源交互驱动；Hooks 驱动系统自动化管理（日志/空间/状态）。 |
+| **中央处理器 (CPU)** | **LLM** | **算力能源**：负责能力驱动。 |
+| **系统内核 (Kernel )** | **Claude Code + CLAUDE.md** | **核心逻辑层**：负责意图识别、指令调度、任务拆解与上下文管理。 |
+| **系统进程（Processes）** | **Sub-Agents (worker/skills)** | **任务执行层**：子智能体隔离运行单个应用或脚本，**减少对主智能体上下文污染**。 |
 | **应用程序 (Apps)** | **Skills (GitHub 技能仓)** | **功能插件层**：通过 GitHub 链接实现“应用商店式”的一键安装与调用。 |
-| **集成环境 (Runtime)** | **Portable Environment** | **底层支撑**：预集成绿色版 Python, Node.js, Git，Windows terminal强力底层工具，确保环境高度统一，增强潜在扩展能力。 |
+| **系统驱动 (Drivers)** | **MCP + Hooks** | **扩展与自动化**：MCP 提供外部系统扩展；Hooks 驱动系统自动化管理（日志/空间/状态）。 |
+| **显示器 (Monitor)** | **Windows Terminal** | **信息输出**：提供运行状态展示，信息输出。 |
+| **集成环境 (Runtime)** | **Portable Environment** | **底层支撑**：集成绿色版 Python, Node.js, Git强力底层工具，确保环境高度统一，增强潜在扩展能力。 |
 
 ---
 
 ## ✨ 核心特性
 
-* 🧠 **内核调度系统 (Kernel)**
-* 意图识别：用CLAUDE.md作为指令集，自动判断任务类型并路由至对应处理器。
-* 会话隔离：通过任务分流，子智能体独立运行，保护主对话 Context 不被冗余数据淹没。
-
-* 🔧 **应用商店式技能管理 (Skills)**
-* **零预装设计**：项目本身不内置功能，用户按需从 GitHub 安装技能。
-* **一键安装**：支持通过 GitHub 仓库链接直接下载、校验并注册技能。
-* **多格式兼容**：支持 SKILL.md、Claude Plugin、Cursor Rules 等。
-* **搭建基础工作流**：通过任务拆解和用户指令，系统支持将多个技能组合成一个任务工作流执行。
-
-* �🖥️ **优化终端UI体验**
-* 沉浸式交互终端：基于现代终端技术构建的可视化命令行界面，兼顾专业感与易用性。
-
-* 🔌 **系统扩展与驱动 (MCP & Hooks)**
-* **MCP 资源驱动**：通过 Model Context Protocol 接入实时搜索、数据库、本地文件等。
-
-* 🛡️ **沙盒化执行环境**
-* 严格权限控制：设定内核只读范围，子智能体写入范围，用户自行判断和控制权限。
-* 安全隔离：防止 AI 生成的实验性内容造成高风险危害。
+* 🧠 **核心特性**
+* **一键启动环境**：双击启动脚本即可启动“claude code”。
+* **一键安装应用**：支持通过 GitHub 仓库链接直接安装技能（skills）,支持多种skills项目类型。
+* **会话隔离**：通过任务分流，子智能体独立运行脚本或skills，保护主对话 Context 不被冗余数据淹没。
+* **沉浸式交互终端**：基于现代终端的可视化界面，兼顾专业感与易用性，默认浅色主题。
+* **搭建基础工作流**：通过任务拆解实现将多个技能组合成串行的工作流执行。
+* **扩展与自动化**：mcp对接外部系统，如AI搜索引擎等；hooks提供自动化支持。
+* **环境沙箱**：工具整体运行在沙箱内，不会影响系统全局设置，智能体内部也配置了专用空间。
 
 ---
 
@@ -73,7 +64,6 @@ ai-station-navigator/
 ├── .claude/                    # 系统配置区 (注册表)
 │   ├── agents/                 # 子智能体定义 (进程)
 │   ├── skills/                 # 已安装的应用（应用中心） 
-│   └── state/                  # 运行时状态
 ├── bin/                        # 系统核心脚本 (内核组件)
 │   ├── skill_manager.py        # 技能管理器 (应用商店入口)
 │   ├── mcp_manager.py          # MCP 驱动管理器
@@ -83,7 +73,6 @@ ai-station-navigator/
 │   ├── workspace/              # 任务处理中心
 │   └── output/                 # 最终产物导出
 ├── CLAUDE.md                   # Kernel 逻辑核心 (System CPU)
-├── .mcp.json                   # MCP 服务器配置 (驱动配置，可用系统命令自动化配置)
 └── requirements.txt            # Python 依赖
 
 ```
@@ -108,7 +97,8 @@ ai-station-navigator/
 * **安装应用**：`安装技能：https://github.com/xxx/repo   （自动执行安装，如果主项目是技能包，建议地址路径正确指示到你需要单个技能，否则会安装整个技能包）
 * **分析应用**：分析技能：https://github.com/xxx/repo   （自动执行分析，并反馈分析结果和安装建议）
 * **使用应用**： `@技能  需求内容`  （自动分析需求匹配已安装技能，确认后可立即执行并返回执行结果）
-* **卸载应用**：`卸载技能：https://github.com/xxx/repo  或  xxx/repo
+* **卸载应用**：`卸载技能：https://github.com/xxx/repo  或  xxx/repo`
+* **尝试创建skills工作流**：`参考 docs\skills-mapping.md 设计一个包含x步的工作流，以流程xx,xx,xx,xx...为准，可以用在xxxx场景`
 这里收藏了一些可用于测试的github项目：[查看技能分类](skills-by-category.md)
 
 ---

@@ -27,7 +27,6 @@
 |:---|:---|:---|
 | `python bin/skill_manager.py list` | 列出已安装技能 | [manager-guide](./guides/skill-manager-guide.md) |
 | `python bin/skill_manager.py search <关键词>` | 搜索技能 | [manager-guide](./guides/skill-manager-guide.md) |
-| `python bin/skill_manager.py info <repo>` | 分析远程仓库（不克隆） | [manager-guide](./guides/skill-manager-guide.md) |
 | `python bin/skill_manager.py install <url>` | 安装技能 | [manager-guide](./guides/skill-manager-guide.md) |
 | `python bin/skill_creator.py init <name>` | 创建新技能 | [creator-guide](./guides/skill-creator-guide.md) |
 | `/Skill <name>` | 调用技能 | [commands.md](./commands.md) |

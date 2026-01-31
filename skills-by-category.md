@@ -207,9 +207,6 @@
 
 ## 七、专业领域 (Professional Domains)
 
-### 📦 [zh-xx/legal-assistant-skills](https://github.com/zh-xx/legal-assistant-skills)
-*   **法律**：`contract-review` (合同审查与风险标注)
-
 ### 📦 [alirezarezvani/claude-skills](https://github.com/alirezarezvani/claude-skills)
 **企业级团队技能矩阵**：
 | 团队 | 技能数 | 覆盖范围 |
@@ -220,7 +217,7 @@
 | 👔 **C-Level** | 2 | CEO/CTO 顾问 |
 | 📢 **Marketing** | 5 | 内容创作, 需求生成, ASO, 社媒分析 |
 
-### 📦 [muratcankoylan/Agent-Skills](https://github.com/muratcankoylan/Agent-Skills-for-Context-Engineering)
+### 📦 [muratcankoylan/Agent-Skills-for-Context-Engineering](https://github.com/muratcankoylan/Agent-Skills-for-Context-Engineering)
 **上下文工程与 Agent 设计**：
 *   **上下文处理**：压缩、优化、降级诊断
 *   **系统设计**：多智能体模式、工具设计、文件系统上下文卸载

@@ -29,8 +29,11 @@ Thumbs.db
 nul
 
 # User workspace (volatile)
-mybox/**/*
+**/mybox/**/*
+# 但追踪 .gitkeep 以保持目录结构
+!**/mybox/**/.gitkeep
 
 # Claude runtime
 **/.claude/memory/*.log
 **/.claude/skills/*
+

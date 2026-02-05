@@ -1,303 +1,323 @@
 # Skill Manager 使用指南
 
-**版本**: v2.0
-**最后更新**: 2026-01-31
-**维护者**: AIOS 项目组
-
----
-
 ## 概述
 
-**Skill Manager** 是技能管理工具，用于安装、搜索、卸载技能，支持多种输入源和格式自动转换。
+`skill_manager.py` 是技能的生命周期管理工具，负责技能的安装、卸载、搜索和验证。
 
-**核心功能**：
-- ✅ 自动检测输入源类型（GitHub / 本地 / .skill 包）
-- ✅ 智能识别技能格式（Official / Claude Plugin / Agent Skills / Cursor Rules）
-- ✅ 自动修复常见格式问题（frontmatter、命名规范）
-- ✅ 批量安装支持
-- ✅ 子技能单独安装
-- ✅ 技能搜索（关键词匹配 + 使用频率加权）
+**版本**: v1.0
+**文件位置**: `bin/skill_manager.py`
 
----
+## 核心功能
 
-## 快速开始
-
-### 基本用法
-
-```bash
-# 安装 GitHub 仓库中的技能
-python bin/skill_manager.py install https://github.com/user/repo
-
-# 安装本地目录
-python bin/skill_manager.py install path/to/skill
-
-# 搜索技能
-python bin/skill_manager.py search prompt
-
-# 列出已安装技能
-python bin/skill_manager.py list
-```
-
----
-
-## 命令详解
-
-### install - 安装技能
-
-#### 语法
-
-```bash
-python bin/skill_manager.py install <source> [选项]
-```
-
-#### 输入源支持
-
-| 输入类型 | 示例 | 说明 |
-|:---|:---|:---|
-| **GitHub URL** | `https://github.com/user/repo` | 自动克隆并安装 |
-| **GitHub 简写** | `user/repo` | 自动补全为完整 URL |
-| **本地目录** | `path/to/skill` | 直接安装 |
-| **.skill 包** | `path/to/skill.skill` | 解压后安装 |
-
-#### 选项
-
-| 选项 | 简写 | 说明 |
-|:---|:---|:---|
-| `--batch` | `-b` | 批量安装仓库中所有技能 |
-| `--skill` | `-s` | 指定要安装的子技能名称 |
-| `--force` | `-f` | 强制覆盖已存在的技能 |
-| `--refresh-cache` | | 强制刷新仓库缓存（重新克隆） |
-
-#### 示例
-
-```bash
-# 安装单技能仓库（自动安装）
-python bin/skill_manager.py install https://github.com/user/single-skill
-
-# 安装多技能仓库（自动批量安装所有子技能）
-python bin/skill_manager.py install https://github.com/obra/superpowers
-# → 找到 17 个技能，自动批量安装
-
-# 只安装指定的子技能
-python bin/skill_manager.py install obra/superpowers --skill brainstorming
-
-# 强制覆盖已安装的技能
-python bin/skill_manager.py install https://github.com/user/repo --force
-```
-
-#### 智能适配行为
-
-| 检测结果 | 自动行为 |
+| 功能 | 说明 |
 |:---|:---|
-| **1 个技能** | 自动安装该技能 |
-| **多个子技能** | 自动批量安装所有 |
-| **用户指定 `--skill`** | 只安装指定的子技能 |
+| **格式检测** | 检测输入技能的格式类型（GitHub/本地/.skill包） |
+| **标准化转换** | 将非标准格式转换为官方 SKILL.md 格式 |
+| **结构验证** | 验证转换后的技能结构完整性 |
+| **自动安装** | 复制到 `.claude/skills/` 并同步数据库 |
+| **智能搜索** | 基于关键词、描述、标签搜索已安装技能 |
 
----
+## 架构
 
-### search - 搜索技能
-
-#### 语法
-
-```bash
-python bin/skill_manager.py search <keywords> [选项]
+```
+Kernel (AI) → Skill Manager → Format Detector → Normalizer → Installer
 ```
 
-#### 参数
+## 支持的格式
 
-| 参数 | 说明 |
-|:---|:---|
-| `keywords` | 搜索关键词（支持多个，AND 逻辑） |
-
-#### 选项
-
-| 选项 | 简写 | 说明 |
+| 格式类型 | 识别标记 | 状态 |
 |:---|:---|:---|
-| `--limit` | `-l` | 返回结果数量（默认 10） |
-| `--score` | `-s` | 显示匹配分数 |
+| **Claude Code Official** | `SKILL.md` | 官方格式，直接处理 |
+| **Claude Plugin** | `.claude-plugin`, `plugin.json` | 内置转换 |
+| **Agent Skills** | `skills/`, `SKILL.md` | 内置转换 |
+| **Cursor Rules** | `.cursor`, `rules/` | 内置转换 |
+| **Plugin Marketplace** | `plugins/`, `MARKETPLACE.md` | 内置转换 |
 
-#### 搜索匹配优先级
-
-| 匹配类型 | 分数 | 说明 |
-|:---|:---:|:---|
-| 名称完全匹配 | 100 | 精确匹配技能名 |
-| 名称前缀匹配 | 90 | 技能名以关键词开头 |
-| 名称包含 | 80 | 技能名包含关键词 |
-| 描述包含 | 50 | 描述中包含关键词 |
-| 标签匹配 | 30 | tags 字段匹配 |
-| 使用频率加权 | +15 | 基于历史使用频率 |
-
-#### 示例
-
+查看所有支持的格式：
 ```bash
-# 单关键词搜索
-python bin/skill_manager.py search prompt
-
-# 多关键词搜索
-python bin/skill_manager.py search prompt optimize --limit 5
-
-# 显示匹配分数
-python bin/skill_manager.py search git --score
-```
-
----
-
-### list - 列出已安装技能
-
-```bash
-# 列出所有已安装技能
-python bin/skill_manager.py list
-
-# 启用颜色输出
-python bin/skill_manager.py list --color
-```
-
----
-
-### uninstall - 卸载技能
-
-#### 语法
-
-```bash
-python bin/skill_manager.py uninstall <name> [选项]
-```
-
-#### 示例
-
-```bash
-# 卸载单个技能
-python bin/skill_manager.py uninstall my-skill
-
-# 批量卸载
-python bin/skill_manager.py uninstall skill1 skill2 skill3
-
-# 强制卸载（不询问确认）
-python bin/skill_manager.py uninstall my-skill --force
-```
-
----
-
-### validate - 验证技能结构
-
-```bash
-# 验证指定技能目录
-python bin/skill_manager.py validate .claude/skills/my-skill
-```
-
-**验证项目**：
-- ✅ SKILL.md 文件存在
-- ✅ YAML frontmatter 格式正确
-- ✅ name 字段符合规范（hyphen-case）
-- ✅ description 字段存在
-
----
-
-### formats - 列出支持的技能格式
-
-```bash
-# 列出所有支持的格式
 python bin/skill_manager.py formats
 ```
 
----
+## 命令参考
 
-### cache - 管理仓库缓存
+### 1. install - 安装技能
 
-```bash
-# 列出缓存
-python bin/skill_manager.py cache list
-
-# 清理所有缓存
-python bin/skill_manager.py cache clear
-
-# 清理超过 24 小时的缓存
-python bin/skill_manager.py cache clear --older-than 24
-
-# 更新指定仓库缓存
-python bin/skill_manager.py cache update https://github.com/user/repo
-```
-
----
-
-### record - 记录技能使用
+#### 从本地目录安装
 
 ```bash
-# 记录技能使用（内部使用，通常无需手动执行）
-python bin/skill_manager.py record <skill-name>
+python bin/skill_manager.py install /path/to/skill
 ```
 
+#### 从 .skill 包安装
+
+```bash
+python bin/skill_manager.py install package.skill
+```
+
+#### 安装指定子技能（多技能仓库）
+
+```bash
+python bin/skill_manager.py install /path/to/repo --skill my-skill
+```
+
+#### 批量安装（所有技能）
+
+```bash
+python bin/skill_manager.py install /path/to/repo --batch
+```
+
+#### 强制覆盖已存在的技能
+
+```bash
+python bin/skill_manager.py install /path/to/skill --force
+```
+
+**参数说明**:
+| 参数 | 说明 |
+|:---|:---|
+| `source` | 安装源（本地目录或 .skill 包） |
+| `--batch, -b` | 批量安装所有技能 |
+| `--skill, -s` | 指定子技能名称 |
+| `--force, -f` | 强制安装，跳过非技能仓库检测 |
+| `--refresh-cache` | 强制刷新仓库缓存 |
+
+> **注意**: GitHub 源需要先使用 `clone_manager` 处理
+
+### 2. list - 列出已安装技能
+
+```bash
+python bin/skill_manager.py list
+```
+
+**启用颜色输出**:
+```bash
+python bin/skill_manager.py list --color
+```
+
+### 3. search - 搜索技能
+
+#### 单关键词搜索
+
+```bash
+python bin/skill_manager.py search prompt
+```
+
+#### 多关键词搜索
+
+```bash
+python bin/skill_manager.py search prompt optimize --score
+```
+
+**参数说明**:
+| 参数 | 说明 |
+|:---|:---|
+| `keywords` | 搜索关键词（支持多个，AND 逻辑） |
+| `--limit, -l` | 返回结果数量（默认 10） |
+| `--score, -s` | 显示匹配分数和匹配原因 |
+
+### 4. uninstall - 卸载技能
+
+#### 卸载单个技能
+
+```bash
+python bin/skill_manager.py uninstall my-skill
+```
+
+#### 批量卸载
+
+```bash
+python bin/skill_manager.py uninstall skill1 skill2 skill3
+```
+
+#### 强制删除（不询问）
+
+```bash
+python bin/skill_manager.py uninstall my-skill --force
+```
+
+### 5. validate - 验证技能结构
+
+```bash
+python bin/skill_manager.py validate .claude/skills/my-skill
+```
+
+### 6. record - 记录技能使用
+
+```bash
+python bin/skill_manager.py record my-skill
+```
+
+> 用于搜索排序时增加使用频率加权
+
+## 搜索评分机制
+
+| 匹配类型 | 分数 | 说明 |
+|:---|:---:|:---|
+| **名称完全匹配** | 100 | 技能名与关键词完全一致 |
+| **名称前缀匹配** | 90 | 技能名以关键词开头 |
+| **名称包含** | 80 | 技能名包含关键词 |
+| **中文关键词** | 40 | 匹配 `keywords_cn` 字段 |
+| **描述包含** | 50 | 描述中包含关键词 |
+| **标签匹配** | 30 | `tags` 字段匹配 |
+| **类别匹配** | 20 | `category` 字段匹配 |
+| **多关键词协同** | +20 | 两个以上关键词同时匹配 |
+| **使用频率** | +3/次 | 最多 +15 分 |
+
+## 技能结构
+
+### SKILL.md 格式
+
+```markdown
+---
+name: my-skill
+description: "技能描述"
+category: utilities
+tags: ["tool", "automation"]
+keywords_cn: ["关键词1", "关键词2"]
 ---
 
-## 支持的技能格式
+# 技能标题
 
-| 格式 | 标记文件 | 处理方式 |
+## 功能说明
+
+描述技能的功能...
+
+## 使用方法
+
+说明如何使用...
+```
+
+### 必需字段
+
+| 字段 | 说明 | 限制 |
 |:---|:---|:---|
-| **Official** | `SKILL.md` | 直接安装 |
-| **Claude Plugin** | `.claude-plugin`, `plugin.json` | 提取 metadata + 安装 |
-| **Agent Skills** | `skills/`, `SKILL.md` | 保留结构 + 安装 |
-| **Cursor Rules** | `.cursor`, `rules/` | 合并 .md 文件 + 安装 |
-| **Generic** | 任意 | 从 README.md 生成 SKILL.md |
+| `name` | 技能名称 | 小写字母、数字、连字符，最多 128 字符 |
+| `description` | 技能描述 | 最多 1024 字符，不能包含 HTML 标签 |
 
----
+### 可选字段
 
-## 使用场景
+| 字段 | 说明 |
+|:---|:---|
+| `category` | 技能分类 |
+| `tags` | 标签列表 |
+| `keywords_cn` | 中文关键词列表 |
 
-### 场景 1：安装单个技能
+## 数据库同步
 
-```bash
-python bin/skill_manager.py install \
-  https://github.com/muratcankoylan/Agent-Skills-for-Context-Engineering
+技能安装/卸载时会自动同步到 `.claude/skills/skills.db`：
+
+```json
+{
+  "_default": {
+    "skill-id": {
+      "id": "skill-id",
+      "name": "skill-name",
+      "folder_name": "skill_folder",
+      "description": "技能描述",
+      "category": "utilities",
+      "tags": ["tool"],
+      "keywords_cn": [],
+      "installed": true,
+      "installed_path": ".claude/skills/skill_folder"
+    }
+  }
+}
 ```
 
-### 场景 2：批量安装技能包
+## GitHub 源处理流程
+
+GitHub 源需要使用 `clone_manager` 预处理：
 
 ```bash
-python bin/skill_manager.py install \
-  https://github.com/obra/superpowers
+# 步骤 1: 克隆仓库
+python bin/clone_manager.py clone https://github.com/user/repo
+
+# 步骤 2: 安全扫描（可选）
+python bin/security_scanner.py scan-all
+
+# 步骤 3: 安装技能
+python bin/skill_manager.py install <缓存路径>
 ```
 
-### 场景 3：安装指定子技能
+## 技能验证规则
 
+### 项目类型检测
+
+系统会自动检测是否为技能仓库，拒绝安装工具项目：
+
+**技能仓库特征**:
+- 根目录有 `SKILL.md`
+- `skills/` 目录包含多个技能
+- `.claude/skills/` 结构
+
+**工具项目特征**:
+- `setup.py`, `Cargo.toml`, `go.mod`
+- 包含 `src/`, `lib/`, `api/` 等工具组件目录
+- README 包含 "skill generator", "cli tool" 等关键词
+
+### 子目录验证
+
+自动跳过非技能目录：
+- 工具组件目录（`src/`, `lib/`, `tests/` 等）
+- Python 包目录（有 `__init__.py` 但无 `SKILL.md`）
+- 不符合命名规范的目录
+
+## 故障排除
+
+### 常见问题
+
+| 问题 | 解决方案 |
+|:---|:---|
+| `拒绝安装：这不是技能项目` | 确认目标确实是技能仓库，使用 `--force` 跳过检测 |
+| `技能名称不符合规范` | 技能名必须是 kebab-case（小写字母+连字符） |
+| `数据库同步失败` | 检查 `.claude/skills/skills.db` 文件权限 |
+| `未找到子技能` | 使用 `list` 查看可用技能，确认名称正确 |
+
+### 调试技巧
+
+查看详细处理过程：
 ```bash
-python bin/skill_manager.py install \
-  https://github.com/obra/superpowers --skill brainstorming
-```
-
----
-
-## 故障排查
-
-### 问题：克隆失败
-
-```bash
-# 方案 1：使用代理
-git config --global http.proxy http://127.0.0.1:7890
-
-# 方案 2：手动克隆后安装本地目录
-git clone https://github.com/user/repo mybox/temp/repo
-python bin/skill_manager.py install mybox/temp/repo
-```
-
-### 问题：技能已存在
-
-```bash
-# 使用 --force 覆盖
 python bin/skill_manager.py install <source> --force
 ```
 
----
+验证技能结构：
+```bash
+python bin/skill_manager.py validate .claude/skills/my-skill
+```
+
+## 工作流程示例
+
+### 完整安装流程
+
+```bash
+# 1. GitHub 源预处理
+python bin/clone_manager.py clone https://github.com/user/skills-repo
+
+# 2. 扫描安全（可选）
+python bin/security_scanner.py scan-all
+
+# 3. 列出可用技能
+python bin/skill_manager.py list
+
+# 4. 搜索特定技能
+python bin/skill_manager.py search prompt --score
+
+# 5. 安装技能
+python bin/skill_manager.py install mybox/cache/repos/user-skills/skill-name
+
+# 6. 验证安装
+python bin/skill_manager.py validate .claude/skills/skill-name
+```
+
+### 批量卸载流程
+
+```bash
+# 批量卸载多个技能
+python bin/skill_manager.py uninstall skill1 skill2 skill3 --force
+```
 
 ## 相关文档
 
-- [技能安装指南](./skills-installation.md)
-- [推荐技能清单](./skills.md)
-- [Vector Registry](./commands.md)
-
----
-
-**更新记录**:
-
-| 日期 | 版本 | 变更 |
-|:---|:---|:---|
-| 2026-01-31 | v2.0 | 移除 convert 命令，简化为 install 为主入口 |
-| 2026-01-28 | v1.3 | 补充 search/uninstall/formats/record 命令 |
+- `docs/skill-install-quickstart.md` - 技能安装快速入门
+- `docs/skills-mapping.md` - 子技能映射表
+- `CLAUDE.md` §3.1 - 技能生命周期协议

@@ -1,9 +1,10 @@
 # 子技能映射表 (Sub-skills Mapping)
 
-> **用途**: 当用户请求安装子技能时，Kernel 查找此表自动定位所属主仓库，并添加 `--skill` 参数
-
-> **数据源**: `skills-by-category.md`
-> **更新日期**: 2026-01-30
+> **🔗 派生关系**: 本文档从 `skills-by-category.md` **自动派生 (Derived Source)**，是子技能路由查询的索引表。
+>
+> **⚡ 用途**: 当用户请求安装子技能时，Kernel 查找此表自动定位所属主仓库，并添加 `--skill` 参数
+>
+> **📅 最后同步**: 2026-02-03 (移除 K-Dense-AI, claudekit-skills, claude-skills)
 
 ---
 
@@ -28,120 +29,6 @@
 
 ---
 
-## 二、科学计算与研究 (K-Dense-AI/claude-scientific-skills)
-
-### 🧬 生物信息与基因组学
-| 子技能名称 | 说明 |
-|:---|:---|
-| `adaptyv` | 蛋白质自动化测试云实验室 |
-| `alphafold-database` | AlphaFold 蛋白质结构数据库 |
-| `anndata` | 单细胞分析注释矩阵 |
-| `arboreto` | 基因调控网络推断 |
-| `benchling-integration` | 研发平台(DNA/蛋白/细胞) |
-| `biopython` | 分子生物学综合工具包 |
-| `cellxgene-census` | 查询单细胞目录 |
-| `clinvar-database` | 查询变异临床意义 |
-| `cosmic-database` | 癌症突变数据库 |
-| `deeptools` | NGS分析工具包 |
-| `dnanexus-integration` | 云基因组平台集成 |
-| `ena-database` | 欧洲核苷酸档案访问 |
-| `ensembl-database` | 基因组数据库查询 |
-| `esm` | 蛋白质语言模型工具包 |
-| `etetoolkit` | 系统发育树工具包 |
-| `flowio` | 解析 FCS 流式细胞术文件 |
-| `gene-database` | NCBI Gene 查询 |
-| `geniml` | 基因组区间机器学习 |
-| `geo-database` | NCBI GEO 基因表达数据 |
-| `gtars` | Rust 高性能基因组分析 |
-| `kegg-database` | KEGG 通路分析 |
-| `pydeseq2` | 差异基因表达分析 |
-| `pysam` | 基因组文件处理 (BAM/VCF) |
-| `scanpy` | 单细胞 RNA-seq 分析 |
-| `scikit-bio` | 生物数据工具包 |
-| `scvi-tools` | 单细胞组学深度生成模型 |
-| `string-database` | 蛋白质相互作用查询 |
-| `uniprot-database` | UniProt 数据库访问 |
-
-### 💊 化学、药物与代谢
-| 子技能名称 | 说明 |
-|:---|:---|
-| `brenda-database` | 酶数据库访问 |
-| `chembl-database` | 生物活性分子查询 |
-| `clinpgx-database` | 药物基因组学数据 |
-| `cobrapy` | 基于约束的代谢建模 |
-| `datamol` | RDKit 的 Python 封装 |
-| `deepchem` | 分子机器学习 |
-| `diffdock` | 分子对接预测 |
-| `drugbank-database` | 药物信息分析 |
-| `fda-database` | OpenFDA API 查询 |
-| `hmdb-database` | 人类代谢组数据库 |
-| `matchms` | 代谢组学谱相似性 |
-| `medchem` | 药物化学过滤器 |
-| `metabolomics-workbench` | 代谢组学数据访问 |
-| `molfeat` | 分子特征化工具 |
-| `opentargets-database` | 靶点-疾病关联查询 |
-| `pubchem-database` | PubChem 化合物查询 |
-| `pyopenms` | 完整质谱分析平台 |
-| `pytdc` | 药物发现数据集 |
-| `rdkit` | 化学信息学工具包 |
-| `rowan` | 量子化学云平台 |
-| `zinc-database` | 可购买化合物数据库 |
-
-### 🔭 物理、量子与工程
-| 子技能名称 | 说明 |
-|:---|:---|
-| `astropy` | 天文学综合库 |
-| `cirq` | Google 量子计算框架 |
-| `fluidsim` | 计算流体力学模拟 |
-| `pennylane` | 量子机器学习框架 |
-| `pymatgen` | 材料科学工具包 |
-| `qiskit` | IBM 量子计算框架 |
-| `qutip` | 量子物理模拟库 |
-| `simpy` | 离散事件仿真框架 |
-
-### 📊 数据科学与机器学习
-| 子技能名称 | 说明 |
-|:---|:---|
-| `aeon` | 时间序列机器学习 |
-| `dask` | 分布式计算框架 |
-| `datacommons-client` | 统计数据访问 |
-| `exploratory-data-analysis` | 探索性数据分析 (EDA) |
-| `geopandas` | 地理空间矢量数据 |
-| `matplotlib` | 基础绘图库 |
-| `networkx` | 网络分析与可视化 |
-| `pandas` | 数据处理库 |
-| `polars` | 数据处理库 |
-| `plotly` | 数据可视化库 |
-| `seaborn` | 数据可视化库 |
-| `pymc-bayesian` | 贝叶斯建模 |
-| `pymoo` | 多目标优化框架 |
-| `pytorch-lightning` | 深度学习框架 |
-| `scikit-learn` | 机器学习标准库 |
-| `scikit-survival` | 生存分析工具包 |
-| `shap` | 模型可解释性 |
-| `statsmodels` | 统计模型库 |
-| `sympy` | 符号数学计算 |
-| `torch-geometric` | 图神经网络 (PyG) |
-| `transformers` | Hugging Face 模型 |
-| `umap-learn` | 降维算法 |
-
-### 📝 科研辅助与写作
-| 子技能名称 | 说明 |
-|:---|:---|
-| `biorxiv-database` | 预印本搜索 |
-| `citation-management` | 引文管理 |
-| `latex-posters` | LaTeX 海报制作 |
-| `literature-review` | 系统性文献综述 |
-| `openalex-database` | 学术文献分析 |
-| `paper-2-web` | 论文转交互式网页 |
-| `peer-review` | 手稿/资助评审辅助 |
-| `pptx-posters` | HTML/CSS 海报制作 |
-| `pubmed-database` | 数据库访问 |
-| `research-grants` | 资助申请撰写 |
-| `scientific-writing` | 科学写作核心技能 |
-| `scientific-visualization` | 出版级图表制作 |
-
----
 
 ## 三、文本处理与写作
 
@@ -162,14 +49,45 @@
 | `algorithmic-art` | p5.js 算法艺术创作 |
 | `frontend-design` | 前端界面创建 |
 | `slack-gif-creator` | Slack 动画 GIF 制作 |
-| `docx` | Word 处理 |
-| `xlsx` | Excel 处理 |
+| `docx` | Word 文档处理 |
+| `xlsx` | Excel 表格处理 |
 | `pdf` | PDF 操作工具包 |
 | `pptx` | PowerPoint 演示文稿 |
 | `doc-coauthoring` | 文档协作工作流 |
 | `mcp-builder` | MCP 服务器构建指南 |
 | `web-artifacts-builder` | 复杂 Web 产物构建 |
 | `webapp-testing` | Web 应用测试 |
+
+### JimLiu/baoyu-skills
+
+#### 🎨 内容生成技能
+| 子技能名称 | 说明 |
+|:---|:---|
+| `baoyu-xhs-images` | 小红书信息图生成器 (9风格×6布局) |
+| `baoyu-infographic` | 专业信息图 (20布局×17风格) |
+| `baoyu-cover-image` | 文章封面图 (5维系统) |
+| `baoyu-slide-deck` | 专业幻灯片生成 (16种预设) |
+| `baoyu-comic` | 知识漫画创作器 (5风格×7基调) |
+| `baoyu-article-illustrator` | 智能文章插图 (6类型×8风格) |
+
+#### 📢 内容发布技能
+| 子技能名称 | 说明 |
+|:---|:---|
+| `baoyu-post-to-x` | 发布到 X/Twitter (推文/长文章) |
+| `baoyu-post-to-wechat` | 发布到微信公众号 (图文/文章) |
+
+#### 🤖 AI生成技能
+| 子技能名称 | 说明 |
+|:---|:---|
+| `baoyu-image-gen` | OpenAI/Google API 图像生成 |
+| `baoyu-danger-gemini-web` | Gemini Web 文本/图像生成 |
+
+#### 🛠️ 实用工具
+| 子技能名称 | 说明 |
+|:---|:---|
+| `baoyu-url-to-markdown` | URL 转 Markdown (Chrome CDP) |
+| `baoyu-danger-x-to-markdown` | X 推文/文章转 Markdown |
+| `baoyu-compress-image` | 图像压缩工具 |
 
 ---
 
@@ -251,11 +169,21 @@
 
 ## 七、专业领域
 
-### alirezarezvani/claude-skills
-企业级团队技能矩阵（43 个技能，覆盖 Engineering/RA/QM/Product/C-Level/Marketing）
-
 ### muratcankoylan/Agent-Skills-for-Context-Engineering
-上下文工程与 Agent 设计（上下文处理、系统设计、评估调试、认知建模）
+上下文工程与 Agent 设计
+
+| 子技能名称 | 说明 |
+|:---|:---|
+| `context-compression` | 上下文压缩 |
+| `context-optimization` | 上下文优化 |
+| `context-degradation-diagnosis` | 降级诊断 |
+| `multiagent-patterns` | 多智能体模式 |
+| `tool-design` | 工具设计 |
+| `filesystem-context-unload` | 文件系统上下文卸载 |
+| `agent-evaluation` | Agent 评估 |
+| `reasoning-trace-optimization` | 推理追踪优化 (Reasoning Trace) |
+| `bdi-modeling` | BDI 精神状态建模 |
+| `memory-system` | 记忆系统实现 |
 
 ---
 
@@ -285,21 +213,65 @@
 
 ## 九、开发工具集
 
-### mrgoonie/claudekit-skills
+---
+
+## 十、安全研究与审计 (trailofbits/skills)
+
+### 🔐 智能合约安全
 | 子技能名称 | 说明 |
 |:---|:---|
-| `web-dev-tools` | React, Next.js, Tailwind CSS 支持 |
-| `backend-tools` | Node.js, Python, Go, 认证模块 |
-| `devops-tools` | Cloudflare, Docker, GCP, 数据库管理 |
-| `debugging-tools` | 系统化调试框架 |
-| `ai-ml-tools` | Gemini API 集成, 上下文工程 |
-| `document-tools` | Word, PDF, PPT, Excel 处理 |
-| `media-tools` | FFmpeg, ImageMagick 媒体处理 |
-| `research-tools` | 文档发现与检索 |
-| `problem-solving` | 高级思维技术框架 |
-| `specialized-tools` | 顺序思考, 图表生成 |
-| `platform-tools` | Shopify 集成, MCP 管理 |
-| `meta-tools` | 技能创建, 代码审查 |
+| `building-secure-contracts` | 智能合约安全工具包，支持 6 条区块链的漏洞扫描器 |
+| `entry-point-analyzer` | 识别智能合约中状态变更的入口点，用于安全审计 |
+
+### 🛡️ 代码审计
+| 子技能名称 | 说明 |
+|:---|:---|
+| `audit-context-building` | 通过超细粒度代码分析构建深度架构上下文 |
+| `burpsuite-project-parser` | 从 Burp Suite 项目文件中搜索和提取数据 |
+| `differential-review` | 基于历史分析的安全差异化代码审查 |
+| `semgrep-rule-creator` | 创建和优化 Semgrep 规则用于自定义漏洞检测 |
+| `semgrep-rule-variant-creator` | 将现有 Semgrep 规则移植到新目标语言 |
+| `sharp-edges` | 识别易错 API、危险配置和隐患设计 |
+| `static-analysis` | 静态分析工具包 (CodeQL, Semgrep, SARIF 解析) |
+| `testing-handbook-skills` | 测试手册技能：Fuzzers、静态分析、Sanitizers、覆盖率 |
+| `variant-analysis` | 基于模式分析在代码库中发现类似漏洞 |
+
+### ✅ 验证
+| 子技能名称 | 说明 |
+|:---|:---|
+| `constant-time-analysis` | 检测加密代码中编译器引入的时序侧信道 |
+| `property-based-testing` | 多语言和智能合约的基于属性测试指导 |
+| `spec-to-code-compliance` | 区块链审计的规范到代码合规性检查器 |
+
+### 📋 审计生命周期
+| 子技能名称 | 说明 |
+|:---|:---|
+| `fix-review` | 验证修复提交是否解决了审计发现且未引入新漏洞 |
+
+### 🔧 逆向工程
+| 子技能名称 | 说明 |
+|:---|:---|
+| `dwarf-expert` | 交互和理解 DWARF 调试格式 |
+
+### 📱 移动安全
+| 子技能名称 | 说明 |
+|:---|:---|
+| `firebase-apk-scanner` | 扫描 Android APK 的 Firebase 安全配置错误 |
+
+### 💻 开发
+| 子技能名称 | 说明 |
+|:---|:---|
+| `ask-questions-if-underspecified` | 实现前澄清需求 |
+
+### 👥 团队管理
+| 子技能名称 | 说明 |
+|:---|:---|
+| `culture-index` | 解释个人和团队的 Culture Index 调查结果 |
+
+### 🛠️ 工具
+| 子技能名称 | 说明 |
+|:---|:---|
+| `claude-in-chrome-troubleshooting` | 诊断和修复 Claude in Chrome MCP 扩展连接问题 |
 
 ---
 

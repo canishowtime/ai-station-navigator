@@ -47,6 +47,11 @@ _lib_dir = Path(__file__).parent.parent / "lib"
 if _lib_dir.exists():
     sys.path.insert(0, str(_lib_dir))
 
+# 添加 bin 目录到 sys.path（仅用于 hooks_manager）
+_bin_dir = Path(__file__).parent
+if str(_bin_dir) not in sys.path:
+    sys.path.insert(0, str(_bin_dir))
+
 # TinyDB for database operations
 try:
     from tinydb import TinyDB, Query
@@ -54,6 +59,11 @@ try:
     TINYDB_AVAILABLE = True
 except ImportError:
     TINYDB_AVAILABLE = False
+
+# =============================================================================
+# 解耦说明：不再直接导入 clone_manager 和 security_scanner
+# 通过 subprocess 调用这些独立模块
+# =============================================================================
 
 # =============================================================================
 # 配置常量
@@ -196,44 +206,45 @@ def header(msg: str):
 
 
 # =============================================================================
-# 格式检测器
+# 格式检测器 (独立实现，解耦于 clone_manager)
 # =============================================================================
 
 class FormatDetector:
     """检测技能输入源的格式类型"""
 
     @staticmethod
-    def parse_github_subpath(github_url: str) -> Tuple[str, Optional[str]]:
+    def validate_github_url(url: str) -> Tuple[bool, Optional[str]]:
         """
-        解析 GitHub URL，提取子路径
+        验证 GitHub URL 格式安全性，防止配置注入攻击
 
-        支持格式:
-        - https://github.com/user/repo
-        - https://github.com/user/repo/tree/main/subdir
-        - https://github.com/user/repo/tree/branch/path/to/skills
+        Args:
+            url: 待验证的 GitHub URL
 
         Returns:
-            (仓库URL, 子路径)
-            子路径示例: "scientific-skills", "path/to/skills"
+            (是否有效, 错误信息)
         """
-        parsed = urlparse(github_url)
-        path_parts = parsed.path.strip('/').split('/')
+        import re
+        # 基础格式检查
+        github_pattern = r'^https?://github\.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+(?:/tree/[^/\s]+(?:/[\w\-./]+)?)?$'
+        if not re.match(github_pattern, url):
+            return False, f"无效的 GitHub URL 格式: {url}"
 
-        # 查找 /tree/ 分隔符
-        if 'tree' in path_parts:
-            tree_idx = path_parts.index('tree')
-            if tree_idx >= 2:  # user/repo/tree/...
-                # 仓库部分: user/repo
-                repo_url = f"{parsed.scheme}://{parsed.netloc}/{'/'.join(path_parts[:tree_idx])}"
-                # 子路径: tree/branch/后面的所有部分
-                if len(path_parts) > tree_idx + 2:  # 至少有 branch/subdir
-                    subpath = '/'.join(path_parts[tree_idx + 2:])
-                    return repo_url, subpath
-                # 只有 branch，没有子路径
-                return repo_url, None
+        # 检查危险的 git 配置注入模式
+        dangerous_patterns = [
+            '--config=', '-c=', '--upload-pack=', '--receive-pack=',
+            '--exec=', '&&', '||', '|', '`', '$(', '\n', '\r', '\x00',
+        ]
 
-        # 没有 /tree/，返回原 URL
-        return github_url, None
+        url_lower = url.lower()
+        for pattern in dangerous_patterns:
+            if pattern in url_lower:
+                return False, f"URL 包含危险字符或模式: {pattern}"
+
+        # 检查 URL 编码绕过尝试
+        if '%2' in url.lower():
+            return False, "URL 包含可疑的编码字符"
+
+        return True, None
 
     @staticmethod
     def detect_input_type(input_source: str) -> Tuple[str, str, Optional[str]]:
@@ -242,26 +253,21 @@ class FormatDetector:
 
         Returns:
             (类型, 路径/URL, 子路径)
-            类型: 'github', 'local', 'skill-package', 'unknown'
-            路径/URL: 统一返回字符串（避免 Windows Path 类型处理 URL 问题）
-            子路径: GitHub 仓库的子目录路径（如 "scientific-skills"）
         """
+        from urllib.parse import urlparse
+
         info(f"检测输入源: {input_source}")
 
         # 1. 检查是否是 GitHub URL
         if input_source.startswith(("http://", "https://")):
             parsed = urlparse(input_source)
             if "github.com" in parsed.netloc:
-                repo_url, subpath = FormatDetector.parse_github_subpath(input_source)
-                if subpath:
-                    info(f"检测到子路径: {subpath}")
-                return "github", repo_url, subpath
+                return "github", input_source, None
 
         # 1.5 检查是否是 GitHub 简写 (user/repo)
         if "/" in input_source and not input_source.startswith((".", "/", "\\")):
             parts = input_source.split("/")
             if len(parts) == 2 and not any(c in input_source for c in ":\\"):
-                # 可能是 user/repo 格式
                 return "github", f"https://github.com/{input_source}", None
 
         # 2. 检查是否是本地路径
@@ -282,7 +288,6 @@ class FormatDetector:
 
         warn("无法识别输入源类型，尝试作为本地目录处理")
         return "unknown", input_source, None
-
 
     @staticmethod
     def detect_skill_format(skill_dir: Path) -> Tuple[str, List[str]]:
@@ -1145,39 +1150,49 @@ class SkillInstaller:
             return None
 
     @staticmethod
-    def _sync_skill_to_db(skill_name: str) -> bool:
-        """将技能同步到数据库（原子操作）"""
-        with db_connection() as (db, Skill):
-            if db is None:
-                return False
+    def _sync_skill_to_db(skill_name: str, db=None, Skill=None) -> bool:
+        """将技能同步到数据库（支持连接复用）
 
-            try:
-                # 从本地 SKILL.md 提取元数据
-                metadata = SkillInstaller._extract_from_local_skill(skill_name)
-                if not metadata:
-                    warn(f"无法提取技能元数据: {skill_name}")
+        Args:
+            skill_name: 技能名称
+            db: 可选的外部数据库连接（用于批量复用）
+            Skill: 可选的外部 Query 对象（用于批量复用）
+        """
+        # 如果未提供外部连接，创建新的连接
+        if db is None or Skill is None:
+            with db_connection() as (conn_db, conn_Skill):
+                if conn_db is None:
                     return False
+                return SkillInstaller._sync_skill_to_db(skill_name, conn_db, conn_Skill)
 
-                # 检查是否已存在（按 folder_name 匹配）
-                existing = db.get(Skill.folder_name == skill_name)
-                if existing:
-                    # 更新现有记录
-                    metadata["installed"] = True
-                    metadata["installed_path"] = f".claude/skills/{skill_name}"
-                    # 保留原有的 keywords_cn
-                    if existing.get("keywords_cn"):
-                        metadata["keywords_cn"] = existing["keywords_cn"]
-                    db.update(metadata, doc_ids=[existing.doc_id])
-                else:
-                    # 新增记录
-                    metadata["installed"] = True
-                    metadata["installed_path"] = f".claude/skills/{skill_name}"
-                    db.insert(metadata)
-
-                return True
-            except Exception as e:
-                warn(f"数据库同步失败: {e}")
+        # 使用提供的连接进行数据库操作
+        try:
+            # 从本地 SKILL.md 提取元数据
+            metadata = SkillInstaller._extract_from_local_skill(skill_name)
+            if not metadata:
+                warn(f"无法提取技能元数据: {skill_name}")
                 return False
+
+            # 检查是否已存在（按 folder_name 匹配）
+            existing = db.get(Skill.folder_name == skill_name)
+            if existing:
+                # 更新现有记录
+                metadata["installed"] = True
+                metadata["installed_path"] = f".claude/skills/{skill_name}"
+                # 保留原有的 keywords_cn
+                if existing.get("keywords_cn"):
+                    metadata["keywords_cn"] = existing["keywords_cn"]
+                db.update(metadata, doc_ids=[existing.doc_id])
+            else:
+                # 新增记录
+                metadata["installed"] = True
+                metadata["installed_path"] = f".claude/skills/{skill_name}"
+                db.insert(metadata)
+
+            return True
+        except Exception as e:
+            warn(f"数据库同步失败: {e}")
+            return False
 
     @staticmethod
     def _remove_skill_from_db(skill_name: str) -> bool:
@@ -1193,74 +1208,6 @@ class SkillInstaller:
             except Exception as e:
                 warn(f"数据库删除失败: {e}")
                 return False
-
-    @staticmethod
-    def install(skill_dir: Path, force: bool = False, author: Optional[str] = None, repo: Optional[str] = None) -> Tuple[bool, str]:
-        """
-        安装技能到 .claude/skills/
-
-        Args:
-            skill_dir: 技能目录
-            force: 是否强制覆盖
-            author: GitHub 作者名（用于构建 folder_name）
-            repo: GitHub 仓库名（用于构建 folder_name）
-
-        Returns:
-            (成功, 消息)
-        """
-        # 优先从 SKILL.md 读取 name，其次使用目录名
-        skill_name_from_md = SkillInstaller._get_skill_name_from_md(skill_dir)
-
-        if skill_name_from_md and author:
-            # GitHub 源: 使用 author-repo-name 格式
-            repo_part = f"-{repo}" if repo else ""
-            skill_name = f"{author}{repo_part}-{skill_name_from_md}".lower()
-        elif skill_name_from_md:
-            # 有 SKILL.md 但无 author
-            skill_name = skill_name_from_md
-        else:
-            # 无 SKILL.md，回退到目录名
-            skill_name = skill_dir.name
-
-        # 1. 验证技能结构
-        is_valid, msg = SkillInstaller._validate_skill_structure(skill_dir)
-        if not is_valid:
-            return False, f"验证失败: {msg}"
-
-        # 1.5 验证技能名称安全性
-        is_valid, msg = validate_skill_name(skill_name)
-        if not is_valid:
-            return False, f"技能名称验证失败: {msg}"
-
-        # 2. 检查是否已存在
-        target_dir = CLAUDE_SKILLS_DIR / skill_name
-        if target_dir.exists():
-            if not force:
-                return False, f"技能已存在: {skill_name}（使用 --force 覆盖）"
-            warn(f"覆盖已存在的技能: {skill_name}")
-            shutil.rmtree(target_dir)
-
-        # 3. 安装（原子操作：文件 + 数据库）
-        try:
-            # 3.1 复制文件
-            shutil.copytree(skill_dir, target_dir)
-
-            # 3.2 同步数据库
-            db_sync_success = SkillInstaller._sync_skill_to_db(skill_name)
-            if db_sync_success:
-                success(f"安装成功: {skill_name} (数据库已同步)")
-            else:
-                # 数据库同步失败，回滚文件操作
-                shutil.rmtree(target_dir)
-                return False, f"数据库同步失败，安装已回退: {skill_name}"
-
-            return True, f"已安装到: {target_dir}"
-        except Exception as e:
-            # 清理可能残留的文件
-            if target_dir.exists():
-                shutil.rmtree(target_dir, ignore_errors=True)
-            return False, f"安装失败: {e}"
-
 
     @staticmethod
     def _validate_skill_structure(skill_dir: Path) -> Tuple[bool, str]:
@@ -1297,89 +1244,160 @@ class SkillInstaller:
         return True, ""
 
 
-    @staticmethod
-    def batch_install(skill_dirs: List[Path], force: bool = False, author: Optional[str] = None, repo: Optional[str] = None) -> Dict[str, Any]:
-        """批量安装技能"""
-        results = {
-            "success": [],
-            "failed": [],
-            "skipped": [],
-        }
+def batch_install(skill_dirs: List[Path], force: bool = False, author: Optional[str] = None, repo: Optional[str] = None, non_interactive: bool = False, scan_results: Optional[Dict] = None) -> Dict[str, Any]:
+    """批量安装技能（重构版：仅负责安装，不进行扫描）
 
-        for skill_dir in skill_dirs:
-            install_ok, msg = SkillInstaller.install(skill_dir, force, author, repo)
-            # 解析实际安装的技能名（从 msg 中提取）
-            installed_name = skill_dir.name
-            if "安装成功: " in msg:
-                installed_name = msg.split("安装成功: ")[1].split("\n")[0].strip()
+    Args:
+        skill_dirs: 技能目录列表
+        force: 是否强制覆盖
+        author: GitHub 作者名
+        repo: GitHub 仓库名
+        scan_results: 可选的扫描结果（由 security_scanner 提供）
 
-            if install_ok:
-                results["success"].append({"name": installed_name, "message": msg})
-            else:
-                if "已存在" in msg and not force:
-                    results["skipped"].append({"name": installed_name, "message": msg})
-                else:
-                    results["failed"].append({"name": installed_name, "message": msg})
+    Returns:
+        {"success": [...], "failed": [...], "skipped": [...]}
+    """
+    results = {
+        "success": [],
+        "failed": [],
+        "skipped": [],
+    }
 
+    # 批量复制所有技能文件
+    copied_skills = []
+    for skill_dir in skill_dirs:
+        # 读取技能名称
+        skill_name_from_md = SkillInstaller._get_skill_name_from_md(skill_dir)
+
+        if skill_name_from_md and author:
+            repo_part = f"-{repo}" if repo else ""
+            skill_name = f"{author}{repo_part}-{skill_name_from_md}".lower()
+        elif skill_name_from_md:
+            skill_name = skill_name_from_md
+        else:
+            skill_name = skill_dir.name
+
+        # 验证技能结构
+        is_valid, msg = SkillInstaller._validate_skill_structure(skill_dir)
+        if not is_valid:
+            results["failed"].append({"name": skill_name, "message": f"验证失败: {msg}"})
+            continue
+
+        # 验证技能名称安全性
+        is_valid, msg = validate_skill_name(skill_name)
+        if not is_valid:
+            results["failed"].append({"name": skill_name, "message": f"名称验证失败: {msg}"})
+            continue
+
+        # 检查是否已存在
+        target_dir = CLAUDE_SKILLS_DIR / skill_name
+        if target_dir.exists():
+            if not force:
+                results["skipped"].append({"name": skill_name, "message": f"技能已存在"})
+                continue
+            shutil.rmtree(target_dir)
+
+        # 复制文件
+        try:
+            shutil.copytree(skill_dir, target_dir)
+            copied_skills.append((skill_name, target_dir))
+        except Exception as e:
+            results["failed"].append({"name": skill_name, "message": f"复制失败: {e}"})
+
+    if not copied_skills:
         return results
+
+    # 如果提供了扫描结果，处理威胁
+    threatened_skills = []
+    safe_skills = []
+
+    if scan_results:
+        for skill_name, target_dir in copied_skills:
+            scan_result = scan_results.get(skill_name, {"status": "skipped"})
+
+            if scan_result.get("status") == "skipped":
+                safe_skills.append((skill_name, target_dir))
+            elif scan_result.get("severity") in ["SAFE", "LOW"]:
+                safe_skills.append((skill_name, target_dir))
+            else:
+                threatened_skills.append((skill_name, target_dir, scan_result))
+                safe_skills.append((skill_name, target_dir))
+
+        # 构建威胁详情
+        threat_details = []
+        for skill_name, target_dir, scan_result in threatened_skills:
+            severity = scan_result.get("severity", "UNKNOWN")
+            threats = scan_result.get("threats", [])
+            threat_info = {
+                "name": skill_name,
+                "severity": severity,
+                "threats_count": len(threats),
+                "threats": [
+                    {
+                        "severity": t.get("severity"),
+                        "title": t.get("title"),
+                        "description": t.get("description"),
+                        "location": t.get("location")
+                    }
+                    for t in threats[:5]
+                ],
+                "target_dir": str(target_dir)
+            }
+            threat_details.append(threat_info)
+
+        if threatened_skills:
+            results["threatened_skills"] = threat_details
+    else:
+        safe_skills = copied_skills
+
+    # 批量写入数据库
+    with db_connection() as (db, Skill):
+        for skill_name, target_dir in safe_skills:
+            db_sync_success = SkillInstaller._sync_skill_to_db(skill_name, db, Skill)
+            if db_sync_success:
+                success(f"✅ 安装成功: {skill_name} (数据库已同步)")
+                results["success"].append({"name": skill_name, "message": "安装成功"})
+            else:
+                # 数据库同步失败，回滚
+                shutil.rmtree(target_dir)
+                results["failed"].append({"name": skill_name, "message": "数据库同步失败，已回滚"})
+
+    # 失效搜索索引缓存
+    if results["success"]:
+        SkillSearcher.invalidate_cache()
+
+    return results
 
 
 # =============================================================================
-# 配置加载（共享）
+# 配置加载（独立实现）
 # =============================================================================
 
 _config_cache: Optional[dict] = None
 _config_mtime: Optional[float] = None
 
-
 def load_config(use_cache: bool = True) -> dict:
-    """
-    加载配置文件（支持缓存）
-
-    Args:
-        use_cache: 是否使用缓存（默认 True）
-    """
+    """加载配置文件"""
     global _config_cache, _config_mtime
-
-    config_file = BASE_DIR / "config.json"
+    config_file = BASE_DIR / ".claude" / "config" / "config.yml"
     if not config_file.exists():
         return {}
-
-    # 检查文件是否被修改
     current_mtime = config_file.stat().st_mtime
     if use_cache and _config_cache is not None and _config_mtime == current_mtime:
         return _config_cache
-
-    # 重新加载配置
-    with open(config_file, "r", encoding="utf-8") as f:
-        _config_cache = json.load(f)
-        _config_mtime = current_mtime
-    return _config_cache
-
+    try:
+        with open(config_file, "r", encoding="utf-8") as f:
+            _config_cache = yaml.safe_load(f) or {}
+            _config_mtime = current_mtime
+        return _config_cache
+    except Exception:
+        return {}
 
 def clear_config_cache() -> None:
-    """清除配置缓存（用于测试或配置更新后）"""
+    """清除配置缓存"""
     global _config_cache, _config_mtime
     _config_cache = None
     _config_mtime = None
-
-
-def get_git_proxies() -> list:
-    """获取 git 加速器列表"""
-    config = load_config()
-    return config.get("git", {}).get("proxies", [])
-
-
-def get_ssl_verify() -> bool:
-    """获取 SSL 验证设置"""
-    config = load_config()
-    return config.get("git", {}).get("ssl_verify", True)
-
-
-def get_raw_proxies() -> list:
-    """获取 raw 文件加速器列表"""
-    config = load_config()
-    return config.get("raw", {}).get("proxies", [])
 
 
 def validate_skill_name(name: str) -> Tuple[bool, str]:
@@ -1400,1187 +1418,14 @@ def validate_skill_name(name: str) -> Tuple[bool, str]:
 
 
 # =============================================================================
-# Quick Fetcher - 快速文件获取器（用于 info 命令）
+# 注意: RemoteSkillAnalyzer 已迁移到 clone_manager.py
 # =============================================================================
-# Remote Skill Analyzer - 远程技能仓库分析器
-# =============================================================================
-
-class RemoteSkillAnalyzer:
-    """分析远程 GitHub 仓库的技能信息（统一入口，自动选择最佳探测方式）
-
-    合并了原 QuickFetcher 和 GitHubAPIAnalyzer 的功能：
-    - 智能选择：GitHub API (有 token) 或 Raw URL + 加速器
-    - 统一预检：check_is_skill_repo() 替代原双路预检
-    - 保持规则：总超时 8s，限流不重试，失败降级到 clone
-    """
-
-    API_BASE = "https://api.github.com"
-    RAW_BASE = "https://raw.githubusercontent.com"
-
-    def __init__(self, repo: str, branch: str = "main", token: Optional[str] = None):
-        """
-        Args:
-            repo: user/repo 格式
-            branch: 分支名，默认 main
-            token: GitHub personal access token (可选，优先使用环境变量)
-        """
-        self.repo = repo
-        self.branch = branch
-        self.token = token or os.environ.get("GITHUB_TOKEN")
-        self._use_cache = True  # 是否使用缓存
-        self.github_url = f"https://github.com/{repo}"
-        # Raw URL 相关
-        self.proxies = get_raw_proxies()
-        self._cache = {}
-        self._working_proxy = None
-
-    def analyze(self) -> Dict[str, Any]:
-        """
-        分析仓库，返回技能信息
-
-        Returns:
-            {
-                "repo": "user/repo",
-                "branch": "main",
-                "skills": [...],
-                "source": "cache|network"
-            }
-        """
-        result = {
-            "repo": self.repo,
-            "branch": "main",
-            "skills": [],
-            "source": "unknown"
-        }
-
-        # 1. 优先检查本地缓存（精确匹配）
-        cache_dir = RepoCacheManager._get_cache_dir(self.github_url)
-        if cache_dir.exists() and self._use_cache:
-            meta = RepoCacheManager.load_meta(cache_dir)
-            if meta and meta.get("url") == self.github_url:
-                result["source"] = "cache"
-                info(f"使用本地缓存分析: {self.repo}")
-                return self._analyze_from_cache(cache_dir, result)
-
-        # 1.5. 尝试模糊匹配缓存（处理仓库名变体）
-        matched_cache = self._find_fuzzy_cache_match()
-        if matched_cache and self._use_cache:
-            result["source"] = "cache"
-            info(f"使用匹配缓存分析: {self.repo} → {matched_cache.name}")
-            return self._analyze_from_cache(matched_cache, result)
-
-        # 2. 缓存不存在，使用网络探测
-        result["source"] = "network"
-        return self._analyze_from_network(result)
-
-    def _find_fuzzy_cache_match(self) -> Optional[Path]:
-        """尝试模糊匹配缓存目录"""
-        if not CACHE_DIR.exists():
-            return None
-
-        # 提取用户和仓库名
-        parts = self.repo.split("/")
-        if len(parts) != 2:
-            return None
-
-        user, repo_name = parts
-        # 标准化仓库名（移除连字符等）
-        normalized_repo = repo_name.replace("-", "").replace("_", "")
-
-        # 遍历缓存目录查找匹配
-        for cache_dir in CACHE_DIR.iterdir():
-            if not cache_dir.is_dir():
-                continue
-
-            meta = RepoCacheManager.load_meta(cache_dir)
-            if not meta:
-                continue
-
-            cached_url = meta.get("url", "")
-            # 检查是否是同一用户的仓库
-            if f"/{user}/" in cached_url or f"\\{user}\\" in cached_url:
-                # 标准化缓存中的仓库名
-                cached_repo = cached_url.split("/")[-1].replace("-", "").replace("_", "")
-                if cached_repo == normalized_repo:
-                    return cache_dir
-
-        return None
-
-    def _analyze_from_cache(self, cache_dir: Path, result: Dict) -> Dict:
-        """从本地缓存分析仓库"""
-        skills = []
-
-        # 扫描缓存目录，查找所有 SKILL.md
-        for skill_md in cache_dir.rglob("SKILL.md"):
-            # 获取相对路径
-            rel_path = skill_md.relative_to(cache_dir)
-
-            # 读取 SKILL.md
-            try:
-                with open(skill_md, "r", encoding="utf-8", errors="ignore") as f:
-                    content = f.read()
-
-                info = self._parse_skill_md(content, str(rel_path.parent))
-                if info:
-                    # 构造 URL
-                    info["url"] = f"{self.github_url}/tree/{result['branch']}/{rel_path.parent}"
-                    info["is_root"] = (str(rel_path.parent) == ".")
-                    skills.append(info)
-            except Exception as e:
-                warn(f"读取 {rel_path} 失败: {e}")
-
-        result["skills"] = sorted(skills, key=lambda x: x["name"])
-        return result
-
-    def _analyze_from_network(self, result: Dict) -> Dict:
-        """通过网络分析仓库"""
-        skills = []
-
-        # 1. 检测分支
-        branches_to_try = ["main", "master"]
-        found_branch = None
-
-        for branch in branches_to_try:
-            self.branch = branch  # 更新分支
-            if self.fetch_file("SKILL.md") or self.fetch_file("README.md"):
-                found_branch = branch
-                break
-
-        if not found_branch:
-            return result
-
-        result["branch"] = found_branch
-
-        # 2. 检测格式
-        marketplace_readme = self.fetch_file("MARKETPLACE.md")
-
-        if marketplace_readme:
-            # Plugin Marketplace 格式
-            result["format"] = "plugin-marketplace"
-            plugin_packages = self._parse_plugin_marketplace()
-            for pkg in plugin_packages:
-                pkg["url"] = f"{self.github_url}/tree/main/plugins/{pkg['name']}"
-                pkg["is_root"] = False
-            skills.extend(plugin_packages)
-        else:
-            # 标准格式：直接探测 SKILL.md 位置
-            root_skill_content = self.fetch_file("SKILL.md")
-
-            if root_skill_content:
-                # 根目录有 SKILL.md
-                root_info = self._parse_skill_md(root_skill_content, "")
-                if root_info:
-                    root_info["is_root"] = True
-                    root_info["url"] = self.github_url
-                    skills.append(root_info)
-
-            # 探测子技能：扫描常见目录
-            sub_skill_paths = self._discover_skill_paths()
-
-            if sub_skill_paths:
-                # 获取子技能信息
-                for path in sub_skill_paths:
-                    content = self.fetch_file(path)
-                    if content:
-                        info = self._parse_skill_md(content, path)
-                        if info:
-                            folder = path.rsplit("/", 1)[0] if "/" in path else ""
-                            info["url"] = f"{self.github_url}/tree/{found_branch}/{folder}"
-                            info["is_root"] = False
-                            skills.append(info)
-
-        result["skills"] = sorted(skills, key=lambda x: x["name"])
-        return result
-
-    def _discover_skill_paths(self) -> List[str]:
-        """
-        探测子技能 SKILL.md 路径
-
-        Returns:
-            SKILL.md 路径列表
-        """
-        skill_paths = []
-        checked = set()
-
-        # 定义要探测的常见位置
-        patterns = [
-            # Plugin Marketplace 格式
-            "plugins/{name}/SKILL.md",
-            # 子技能目录格式
-            "skills/{name}/SKILL.md",
-            # 根目录子技能格式
-            "{name}/SKILL.md",
-        ]
-
-        # 常见技能名称
-        common_names = [
-            "commit", "review-pr", "pdf", "web-search", "image-analysis",
-            "doc-coauthoring", "copywriting", "email-sequence", "popup-cro",
-            "translator", "summarizer", "code-run", "terminal"
-        ]
-
-        # 从 README 提取可能的目录名
-        readme = self.fetch_file("README.md")
-        discovered_names = set()
-
-        if readme:
-            import re
-            links = re.findall(r'\[([^\]]+)\]\(([^)]+)\)', readme)
-            for name, link in links:
-                link = link.strip().lstrip("./").rstrip("/")
-                if not link.startswith("http") and "/" in link:
-                    dir_name = link.split("/")[0]
-                    discovered_names.add(dir_name)
-
-        # 合并探测列表：README 发现的 + 常见名称
-        names_to_check = list(discovered_names) + common_names
-
-        # 探测每个可能的路径
-        for pattern in patterns:
-            for name in names_to_check:
-                if "{name}" in pattern:
-                    path = pattern.replace("{name}", name)
-                else:
-                    continue
-
-                if path in checked:
-                    continue
-
-                if self.fetch_file(path):
-                    skill_paths.append(path)
-                    checked.add(path)
-
-        return sorted(skill_paths)
-
-    def _parse_skill_md(self, content: str, file_path: str) -> Optional[Dict]:
-        """
-        解析 SKILL.md 内容
-
-        Args:
-            content: SKILL.md 内容
-            file_path: 文件路径（用于提取 folder）
-
-        Returns:
-            技能信息字典
-        """
-        frontmatter = SkillNormalizer.extract_frontmatter(content)
-
-        name = frontmatter.get("name", "")
-        if not name:
-            # 从 file_path 提取名称
-            if file_path:
-                folder = file_path.replace("\\", "/").rsplit("/", 1)[-1] if "/" in file_path else ""
-                name = folder if folder else "unknown"
-            else:
-                name = "unknown"
-
-        return {
-            "name": name,
-            "folder": file_path.replace("\\", "/") if file_path else "",
-            "description": frontmatter.get("description", DEFAULT_SKILL_DESC),
-            "category": frontmatter.get("category", DEFAULT_SKILL_CATEGORY),
-            "tags": frontmatter.get("tags", DEFAULT_SKILL_TAGS.copy())
-        }
-
-    def _parse_plugin_marketplace(self) -> List[Dict]:
-        """
-        解析 Plugin Marketplace 格式的仓库
-
-        Returns:
-            插件包列表 [{"name": "...", "description": "...", "category": "..."}, ...]
-        """
-        plugin_packages = []
-
-        readme_content = self.fetch_file("README.md")
-        if not readme_content:
-            return plugin_packages
-
-        import re
-        lines = readme_content.split("\n")
-        in_plugin_list = False
-
-        for line in lines:
-            if "**Available Plugin Categories:**" in line or "Available Plugin Categories:" in line:
-                in_plugin_list = True
-                continue
-
-            if in_plugin_list and line.startswith("## ") and "Categories" not in line:
-                break
-
-            if in_plugin_list:
-                plugin_match = re.match(r'^-\s`([a-z-]+)`\s+-\s+(.+)$', line)
-                if plugin_match:
-                    plugin_packages.append({
-                        "name": plugin_match.group(1),
-                        "description": plugin_match.group(2).strip()[:100],
-                        "category": "Plugin Package",
-                        "type": "plugin-package"
-                    })
-
-        return plugin_packages
-
-    # =============================================================================
-    # 统一探测方法 (合并 QuickFetcher + GitHubAPIAnalyzer)
-    # =============================================================================
-
-    @staticmethod
-    def _validate_url(url: str) -> bool:
-        """验证 URL 安全性，防止命令注入"""
-        try:
-            from urllib.parse import urlparse
-            parsed = urlparse(url)
-            if parsed.scheme not in ('http', 'https'):
-                return False
-            if not parsed.netloc:
-                return False
-            dangerous = [';', '&', '|', '$', '`', '\n', '\r']
-            return not any(c in url for c in dangerous)
-        except Exception:
-            return False
-
-    def fetch_file(self, file_path: str, prefer_api: bool = False) -> Optional[str]:
-        """
-        获取文件内容 - 自动选择最佳方式
-
-        Args:
-            file_path: 文件路径
-            prefer_api: 是否优先使用 API (默认 False，优先 Raw)
-
-        Returns:
-            文件内容字符串，失败返回 None
-        """
-        # 检查缓存
-        if file_path in self._cache:
-            return self._cache[file_path]
-
-        # 策略选择
-        if prefer_api and self.token:
-            # 有 token，优先 API
-            content = self._fetch_via_api(file_path)
-            if content is not None:
-                self._cache[file_path] = content
-                return content
-
-        # 默认使用 Raw URL (带加速器)
-        content = self._fetch_via_raw(file_path)
-        if content is not None:
-            self._cache[file_path] = content
-            return content
-
-        # Raw 失败，有 token 则尝试 API
-        if self.token and not prefer_api:
-            content = self._fetch_via_api(file_path)
-            if content is not None:
-                self._cache[file_path] = content
-                return content
-
-        return None
-
-    def _fetch_via_raw(self, file_path: str) -> Optional[str]:
-        """
-        通过 Raw URL 获取文件 (支持加速器)
-
-        Returns:
-            文件内容，失败返回 None
-        """
-        path = f"{self.repo}/{self.branch}/{file_path}"
-
-        # 1. 优先使用已知可用代理
-        if self._working_proxy:
-            proxy_url = self._working_proxy.replace("{path}", path)
-            content = self._try_fetch_url(proxy_url)
-            if content is not None:
-                return content
-            self._working_proxy = None
-
-        # 2. 尝试加速器列表
-        for proxy_template in self.proxies:
-            proxy_url = proxy_template.replace("{path}", path)
-            content = self._try_fetch_url(proxy_url)
-            if content is not None:
-                self._working_proxy = proxy_template
-                return content
-
-        # 3. 回退到原始地址
-        raw_url = f"{self.RAW_BASE}/{path}"
-        return self._try_fetch_url(raw_url)
-
-    def _try_fetch_url(self, url: str) -> Optional[str]:
-        """尝试从指定 URL 获取文件"""
-        if not self._validate_url(url):
-            return None
-        try:
-            result = subprocess.run(
-                ["curl", "-s", "--max-time", "5", "--connect-timeout", "3", url],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                check=False
-            )
-            if result.returncode == 0 and result.stdout:
-                content = result.stdout
-                if not content or "404: Not Found" in content or "<title>404" in content:
-                    return None
-                return content
-        except Exception:
-            pass
-        return None
-
-    def _fetch_via_api(self, file_path: str) -> Optional[str]:
-        """
-        通过 GitHub API 获取文件
-
-        Returns:
-            文件内容，失败或限流返回 None
-        """
-        url = f"{self.API_BASE}/repos/{self.repo}/contents/{file_path}"
-        headers = {"Accept": "application/vnd.github.v3.raw"}
-        if self.token:
-            headers["Authorization"] = f"token {self.token}"
-
-        cmd = ["curl", "-s", "--max-time", "3", url]
-        for k, v in headers.items():
-            cmd.extend(["-H", f"{k}: {v}"])
-
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                check=False
-            )
-
-            # 检查限流 (限流不重试，直接返回 None)
-            if result.returncode == 403:
-                if "rate limit exceeded" in result.stdout.lower() or "api rate limit" in result.stdout.lower():
-                    return None  # 限流，切换到 Raw
-                return None  # 其他 403
-
-            if result.returncode == 200 and result.stdout:
-                # 检查是否是 base64 编码
-                if result.stdout.startswith("{"):
-                    try:
-                        import json
-                        import base64
-                        data = json.loads(result.stdout)
-                        if "content" in data:
-                            return base64.b64decode(data["content"]).decode("utf-8", errors="ignore")
-                    except Exception:
-                        pass
-                return result.stdout
-            return None
-        except Exception:
-            return None
-
-    def check_is_skill_repo(self) -> Tuple[Optional[bool], str]:
-        """
-        统一的技能仓库预检 (替代原双路预检)
-
-        规则：
-        - 总超时：3s (API) + 5s (Raw) = 8s
-        - 限流：检测到限流立即切换方式，不重试
-        - 重试：0 次
-        - 降级：两者都失败 → 返回 None，降级到 clone
-
-        Returns:
-            (True, "通过")     → 判定为技能，继续 clone
-            (False, "非技能")  → 拒绝安装
-            (None, "超时/限流") → 降级到 clone
-        """
-        # 1. 尝试 GitHub API (3s 超时)
-        api_result = self._check_via_api()
-        if api_result is not None:
-            is_skill, reason = api_result
-            if is_skill is False:
-                # API 明确判定为非技能
-                return False, reason
-            # is_skill is True 或 is_skill is None (API 超时/限流)
-            # 继续尝试 Raw
-
-        # 2. API 未明确判定非技能，尝试 Raw URL (5s 超时)
-        raw_result = self._check_via_raw()
-        if raw_result is not None:
-            is_skill, reason = raw_result
-            if is_skill is True:
-                # Raw 判定为技能
-                return True, reason
-            # Raw 未找到技能标记，但不一定是非技能（可能探测不完整）
-            # 继续降级
-
-        # 3. 判决逻辑
-        if api_result and api_result[0] is True:
-            return True, api_result[1]
-        if raw_result and raw_result[0] is True:
-            return True, raw_result[1]
-
-        # 4. 两者都未找到明确证据 → 降级
-        return None, "预检超时或失败，降级到 clone"
-
-    def _check_via_api(self) -> Optional[Tuple[bool, str]]:
-        """通过 API 检查是否为技能仓库"""
-        # 1. 检查根目录 SKILL.md
-        result = self._api_exists("SKILL.md")
-        if result is True:
-            return True, "根目录存在 SKILL.md"
-        elif result is False:
-            # 404，继续检查其他
-            pass
-        else:
-            # 超时/限流
-            return None
-
-        # 2. 检查 skills/ 目录
-        result = self._api_exists("skills")
-        if result is True:
-            return True, "存在 skills/ 目录"
-
-        # 3. 检查 .claude/skills
-        result = self._api_exists(".claude/skills")
-        if result is True:
-            return True, "存在 .claude/skills 目录"
-
-        # 4. 检查工具项目文件（判定为非技能）
-        for tool_file in ProjectValidator.TOOL_PROJECT_FILES:
-            result = self._api_exists(tool_file)
-            if result is True:
-                return False, f"检测到工具项目文件: {tool_file}"
-
-        # 5. 检查模糊项目文件
-        for ambiguous_file in ProjectValidator.AMBIGUOUS_PROJECT_FILES:
-            result = self._api_exists(ambiguous_file)
-            if result is True:
-                content = self.fetch_file(ambiguous_file, prefer_api=True)
-                if content and ("tool.scripts" in content or "command-line" in content.lower()):
-                    return False, f"检测到工具项目配置: {ambiguous_file}"
-
-        return None  # 无法判定
-
-    def _api_exists(self, path: str) -> Optional[bool]:
-        """
-        检查文件/目录是否存在 (通过 API)
-
-        Returns:
-            True=存在, False=不存在(404), None=超时/失败/限流
-        """
-        url = f"{self.API_BASE}/repos/{self.repo}/contents/{path}"
-        headers = {}
-        if self.token:
-            headers["Authorization"] = f"token {self.token}"
-
-        cmd = ["curl", "-s", "--max-time", "3", url]
-        for k, v in headers.items():
-            cmd.extend(["-H", f"{k}: {v}"])
-
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                check=False
-            )
-
-            if result.returncode == 403:
-                if "rate limit exceeded" in result.stdout.lower() or "api rate limit" in result.stdout.lower():
-                    return None  # 限流
-                return None  # 其他 403
-
-            if result.returncode == 200:
-                return True
-            elif result.returncode == 404:
-                return False
-            return None
-        except Exception:
-            return None
-
-    def _check_via_raw(self) -> Optional[Tuple[bool, str]]:
-        """通过 Raw URL 检查是否为技能仓库"""
-        # 检查根目录 SKILL.md
-        content = self.fetch_file("SKILL.md")
-        if content:
-            return True, f"Raw 发现 SKILL.md (分支: {self.branch})"
-
-        # 检查 skills/ 目录
-        if self.fetch_file("skills/commit/SKILL.md"):
-            return True, f"Raw 发现 skills/ 目录 (分支: {self.branch})"
-
-        return None  # 未找到技能标记
-
-
-# =============================================================================
-# 仓库缓存管理器
-# =============================================================================
-
-class RepoCacheManager:
-    """管理 GitHub 仓库的持久化缓存"""
-
-    @staticmethod
-    def _sanitize_url(url: str) -> str:
-        """将 URL 转换为安全的目录名"""
-        # 移除协议和特殊字符
-        clean = url.replace("https://", "").replace("http://", "")
-        clean = clean.replace("/", "_").replace("\\", "_")
-        # 限制长度
-        return clean[:100]
-
-    @staticmethod
-    def _get_cache_dir(github_url: str) -> Path:
-        """获取仓库的缓存目录"""
-        cache_name = RepoCacheManager._sanitize_url(github_url)
-        return CACHE_DIR / cache_name
-
-    @staticmethod
-    def _get_meta_file(cache_dir: Path) -> Path:
-        """获取缓存元数据文件路径"""
-        return cache_dir / ".meta.json"
-
-    @staticmethod
-    def load_meta(cache_dir: Path) -> Optional[Dict]:
-        """加载缓存元数据"""
-        meta_file = RepoCacheManager._get_meta_file(cache_dir)
-        if meta_file.exists():
-            try:
-                with open(meta_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception:
-                pass
-        return None
-
-    @staticmethod
-    def save_meta(cache_dir: Path, meta: Dict):
-        """保存缓存元数据"""
-        meta_file = RepoCacheManager._get_meta_file(cache_dir)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        with open(meta_file, "w", encoding="utf-8") as f:
-            json.dump(meta, f, indent=2, ensure_ascii=False)
-
-    @staticmethod
-    def get_or_clone(
-        github_url: str,
-        force_refresh: bool = False,
-        timeout: int = 300
-    ) -> Tuple[bool, Optional[Path], str]:
-        """
-        获取仓库（优先从缓存）
-
-        Args:
-            github_url: 仓库 URL
-            force_refresh: 强制刷新缓存
-            timeout: 克隆超时时间（秒）
-
-        Returns:
-            (成功, 仓库路径, 消息)
-        """
-        cache_dir = RepoCacheManager._get_cache_dir(github_url)
-
-        # 1. 检查缓存是否存在
-        if cache_dir.exists() and not force_refresh:
-            meta = RepoCacheManager.load_meta(cache_dir)
-            if meta and meta.get("url") == github_url:
-                # 缓存有效
-                cached_time = meta.get("cached_at", "")
-                return True, cache_dir, f"使用缓存 (缓存于 {cached_time})"
-
-        # 2. 缓存不存在或强制刷新，执行克隆
-        info(f"克隆仓库到缓存: {github_url}")
-
-        # 如果旧缓存存在，先删除
-        if cache_dir.exists():
-            # 使用系统命令删除（避免 Windows 文件锁定问题）
-            try:
-                subprocess.run(["rm", "-rf", str(cache_dir)], capture_output=True, timeout=10)
-            except:
-                pass
-            # 验证清理是否成功
-            if cache_dir.exists():
-                warn(f"缓存清理失败，使用 shutil 强制重试: {cache_dir}")
-                import time
-                time.sleep(0.5)
-                try:
-                    shutil.rmtree(cache_dir, ignore_errors=False)
-                except Exception as e:
-                    error(f"无法删除缓存目录，请手动删除后重试: {cache_dir}")
-                    error(f"错误信息: {e}")
-                    return False, None, f"缓存清理失败: {e}"
-
-        CACHE_DIR.mkdir(parents=True, exist_ok=True)
-
-        # 执行克隆
-        clone_ok, _ = GitHubHandler.clone_repo(github_url, cache_dir)
-
-        if not clone_ok:
-            return False, None, "仓库不存在或路径错误，请确认:\n1. 仓库 URL 是否正确\n2. 是否为子技能（尝试使用 --skill 参数）\n3. 查看映射表: docs/skills-mapping.md"
-
-        # 保存元数据
-        meta = {
-            "url": github_url,
-            "cached_at": datetime.now().isoformat(),
-            "branch": "main"  # 默认分支
-        }
-        RepoCacheManager.save_meta(cache_dir, meta)
-
-        return True, cache_dir, "缓存创建成功"
-
-    @staticmethod
-    def update_cache(github_url: str) -> Tuple[bool, str]:
-        """
-        更新已有缓存（git pull）
-
-        Args:
-            github_url: 仓库 URL
-
-        Returns:
-            (成功, 消息)
-        """
-        cache_dir = RepoCacheManager._get_cache_dir(github_url)
-
-        if not cache_dir.exists():
-            return False, "缓存不存在"
-
-        try:
-            import subprocess
-            result = subprocess.run(
-                ["git", "-C", str(cache_dir), "pull"],
-                capture_output=True,
-                text=True,
-                timeout=60,
-                encoding="utf-8",
-                errors="replace"
-            )
-
-            if result.returncode == 0:
-                # 更新元数据
-                meta = RepoCacheManager.load_meta(cache_dir) or {}
-                meta["last_updated"] = datetime.now().isoformat()
-                RepoCacheManager.save_meta(cache_dir, meta)
-                return True, "缓存更新成功"
-            else:
-                return False, f"更新失败: {result.stderr}"
-
-        except Exception as e:
-            return False, f"更新异常: {e}"
-
-    @staticmethod
-    def clear_cache(older_than_hours: Optional[int] = None) -> Dict[str, int]:
-        """
-        清理缓存
-
-        Args:
-            older_than_hours: 只清理超过指定小时数的缓存，None 表示全部清理
-
-        Returns:
-            统计信息 {"cleared": 清理数量, "kept": 保留数量}
-        """
-        if not CACHE_DIR.exists():
-            return {"cleared": 0, "kept": 0}
-
-        cleared = 0
-        kept = 0
-        current_time = time.time()
-
-        for cache_dir in CACHE_DIR.iterdir():
-            if not cache_dir.is_dir():
-                continue
-
-            try:
-                if older_than_hours is None:
-                    # 全部清理
-                    shutil.rmtree(cache_dir)
-                    cleared += 1
-                else:
-                    # 检查年龄
-                    meta = RepoCacheManager.load_meta(cache_dir)
-                    if meta:
-                        cached_at_str = meta.get("cached_at", "")
-                        try:
-                            from datetime import datetime
-                            cached_at = datetime.fromisoformat(cached_at_str)
-                            age_hours = (current_time - cached_at.timestamp()) / 3600
-
-                            if age_hours > older_than_hours:
-                                shutil.rmtree(cache_dir)
-                                cleared += 1
-                            else:
-                                kept += 1
-                        except Exception:
-                            kept += 1
-                    else:
-                        # 无元数据，删除
-                        shutil.rmtree(cache_dir)
-                        cleared += 1
-            except Exception:
-                kept += 1
-
-        return {"cleared": cleared, "kept": kept}
-
-    @staticmethod
-    def list_cache() -> List[Dict]:
-        """
-        列出所有缓存
-
-        Returns:
-            缓存列表 [{"url": ..., "cached_at": ..., "size_mb": ...}, ...]
-        """
-        if not CACHE_DIR.exists():
-            return []
-
-        caches = []
-        for cache_dir in CACHE_DIR.iterdir():
-            if not cache_dir.is_dir():
-                continue
-
-            meta = RepoCacheManager.load_meta(cache_dir)
-            if meta:
-                # 计算大小
-                try:
-                    size_bytes = sum(
-                        f.stat().st_size
-                        for f in cache_dir.rglob("*")
-                        if f.is_file()
-                    )
-                    size_mb = round(size_bytes / (1024 * 1024), 2)
-                except Exception:
-                    size_mb = 0
-
-                caches.append({
-                    "url": meta.get("url", "Unknown"),
-                    "cached_at": meta.get("cached_at", "Unknown"),
-                    "last_updated": meta.get("last_updated", "Never"),
-                    "size_mb": size_mb,
-                    "path": str(cache_dir)
-                })
-
-        # 按缓存时间排序
-        caches.sort(key=lambda x: x["cached_at"], reverse=True)
-        return caches
-
-
-# =============================================================================
-# GitHub 处理器
-# =============================================================================
-
-class GitHubHandler:
-    """处理 GitHub 仓库的克隆和提取"""
-
-    @staticmethod
-    def clone_repo(github_url: str, target_dir: Path) -> Tuple[bool, Path]:
-        """
-        克隆 GitHub 仓库（支持加速器）
-
-        Returns:
-            (成功, 克隆目录)
-        """
-        info(f"克隆仓库: {github_url}")
-
-        # 预清理：若目标目录已存在（如上次超时残留），先删除
-        if target_dir.exists():
-            info(f"目标目录已存在，清理: {target_dir}")
-            # 使用系统命令删除（避免 Windows 文件锁定问题）
-            try:
-                subprocess.run(["rm", "-rf", str(target_dir)], capture_output=True, timeout=10)
-            except:
-                pass
-            # 验证清理是否成功
-            if target_dir.exists():
-                warn(f"目录清理失败，使用 shutil 强制重试: {target_dir}")
-                import time
-                time.sleep(0.5)
-                shutil.rmtree(target_dir, ignore_errors=False)
-
-        # 构建基础 git 命令
-        cmd = ["git"]
-        if not get_ssl_verify():
-            cmd.extend(["-c", "http.sslVerify=false"])
-        # 启用长路径支持（Windows 260字符限制）
-        cmd.extend(["-c", "core.longPaths=true"])
-
-        # 设置环境变量：禁用 Git 交互式提示（避免 askpass 错误）
-        import os
-        env = os.environ.copy()
-        env["GIT_TERMINAL_PROMPT"] = "0"
-        env["GIT_ASKPASS"] = "true"
-
-        # 尝试加速器
-        proxies = get_git_proxies()
-        for proxy_template in proxies:
-            # 将 URL 转换为加速器 URL
-            repo_path = github_url.replace("https://github.com/", "").replace("http://github.com/", "")
-            proxy_url = proxy_template.replace("{repo}", repo_path)
-
-            try:
-                clone_cmd = cmd + ["clone", "--depth", "1", proxy_url, str(target_dir)]
-                result = subprocess.run(
-                    clone_cmd,
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    timeout=20,
-                    env=env,
-                )
-
-                if result.returncode == 0:
-                    success(f"克隆成功（使用加速器）: {target_dir}")
-                    return True, target_dir
-                else:
-                    warn(f"加速器克隆失败: {proxy_url}")
-                    warn(f"错误: {result.stderr}")
-            except subprocess.TimeoutExpired:
-                warn(f"加速器超时: {proxy_url}")
-                continue
-            except Exception as e:
-                warn(f"加速器异常: {e}")
-                continue
-
-        # 回退到原始地址
-        try:
-            clone_cmd = cmd + ["clone", "--depth", "1", github_url, str(target_dir)]
-            result = subprocess.run(
-                clone_cmd,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=300,
-                env=env,
-            )
-
-            if result.returncode == 0:
-                success(f"克隆成功: {target_dir}")
-                return True, target_dir
-            else:
-                error(f"克隆失败: {result.stderr}")
-                return False, target_dir
-
-        except subprocess.TimeoutExpired:
-            error("克隆超时")
-            return False, target_dir
-        except Exception as e:
-            error(f"克隆异常: {e}")
-            return False, target_dir
-
-
-    @staticmethod
-    def _recursive_skill_scan(
-        root_dir: Path,
-        max_depth: int = 5,
-        exclude_dirs: Optional[set] = None
-    ) -> List[Dict[str, Path]]:
-        """递归扫描所有子目录，查找 SKILL.md 文件
-
-        支持任意深度嵌套的子技能检测（如 plugins/yc-advisor/skills/yc-advisor）
-
-        Args:
-            root_dir: 仓库根目录
-            max_depth: 最大递归深度
-            exclude_dirs: 排除的目录名集合
-
-        Returns:
-            [{"path": Path, "relative_path": str}, ...]
-            - path: 技能目录绝对路径
-            - relative_path: 相对于 root_dir 的路径
-        """
-        if exclude_dirs is None:
-            exclude_dirs = {"examples", "templates", "test", "tests", "docs", "reference", ".git", "node_modules", "__pycache__"}
-
-        results = []
-
-        def _scan_recursive(current_dir: Path, current_depth: int, rel_path: str = ""):
-            if current_depth > max_depth:
-                return
-
-            try:
-                for item in current_dir.iterdir():
-                    # 跳过排除目录和隐藏文件
-                    if item.name in exclude_dirs or item.name.startswith('.'):
-                        continue
-
-                    if item.is_dir():
-                        new_rel_path = f"{rel_path}/{item.name}" if rel_path else item.name
-
-                        # 检查是否包含 SKILL.md
-                        if (item / "SKILL.md").exists():
-                            results.append({
-                                "path": item,
-                                "relative_path": new_rel_path
-                            })
-                            info(f"发现深层技能: {new_rel_path}")
-
-                        # 继续递归
-                        _scan_recursive(item, current_depth + 1, new_rel_path)
-            except (PermissionError, OSError):
-                pass
-
-        _scan_recursive(root_dir, 0)
-        return results
-
-    @staticmethod
-    def extract_skills(repo_dir: Path) -> List[Path]:
-        """从仓库中提取所有技能目录
-
-        智能识别：
-        1. 优先检测 .skill 包文件（技能包仓库）
-        2. 当检测到多平台版本时，优先选择 Claude Code 版本
-        3. 过滤掉 examples/templates 等非技能目录
-        """
-        skill_dirs = []
-
-        # 排除目录列表（非技能目录）
-        exclude_dirs = {"examples", "templates", "test", "tests", "docs", "reference"}
-
-        # 第零轮：检测 .skill 包文件（技能包仓库）
-        skill_packages = list(repo_dir.glob("*.skill"))
-        if skill_packages:
-            info(f"检测到技能包文件: {skill_packages[0].name}")
-            # 解压 .skill 包到临时目录
-            extract_dir = repo_dir.parent / f"{repo_dir.name}_extracted"
-            extract_ok, extracted = SkillPackHandler.extract_pack(skill_packages[0], extract_dir)
-            if extract_ok:
-                skill_dirs.append(extracted)
-            return skill_dirs
-
-        # 平台优先级配置（高到低）
-        # Claude Code 官方路径优先，其次是通用路径
-        platform_priority = [
-            repo_dir / ".agent" / "skills",   # Claude Code (最高优先级)
-            repo_dir / ".claude" / "skills",   # ClaudeKit 多技能仓库
-            repo_dir / "skills",               # 通用技能目录
-            repo_dir / ".claude-plugin",       # Claude Plugin
-            repo_dir / ".cursor" / "rules",    # Cursor
-            repo_dir,                          # 根目录
-        ]
-
-        # 第一轮：检测是否有 Claude Code 版本
-        claude_code_skills = []
-        agent_skills_dir = repo_dir / ".agent" / "skills"
-        if agent_skills_dir.exists():
-            for item in agent_skills_dir.glob("*/SKILL.md"):
-                # 排除非技能目录
-                if item.parent.name not in exclude_dirs:
-                    claude_code_skills.append(item.parent)
-
-        # 如果找到 Claude Code 版本，优先使用
-        if claude_code_skills:
-            return claude_code_skills
-
-        # 第二轮：按优先级扫描其他位置
-        for location in platform_priority[1:]:  # 跳过 .agent（已检查）
-            if location.exists() and location.is_dir():
-                # 特殊处理1：根目录直接包含 SKILL.md（单技能或多技能容器）
-                if location == repo_dir:
-                    if (location / "SKILL.md").exists():
-                        # 检测是否为"多技能容器"（包含多个子技能）
-                        sub_skill_dirs = [
-                            item.parent for item in repo_dir.glob("*/SKILL.md")
-                            if item.parent.name not in exclude_dirs
-                        ]
-                        # 阈值：3 个及以上子技能判定为多技能容器
-                        MULTI_SKILL_THRESHOLD = 3
-                        if len(sub_skill_dirs) >= MULTI_SKILL_THRESHOLD:
-                            info(f"检测到多技能容器: {repo_dir.name} (包含 {len(sub_skill_dirs)} 个子技能)")
-                            skill_dirs.extend(sub_skill_dirs)
-                        else:
-                            # 单技能，添加容器目录
-                            skill_dirs.append(location)
-                        continue
-                    else:
-                        # 根目录没有 SKILL.md：检查是否为 monorepo（子目录包含技能）
-                        # 特殊检查 skills/ 目录（常见于 monorepo）
-                        skills_dir = repo_dir / "skills"
-                        if skills_dir.exists() and skills_dir.is_dir():
-                            sub_skill_count = 0
-                            sub_skill_candidates = []
-                            for item in skills_dir.iterdir():
-                                if item.is_dir() and (item / "SKILL.md").exists():
-                                    sub_skill_candidates.append(item)
-                                    sub_skill_count += 1
-                            # skills/ 目录有 1+ 个技能就认为是 monorepo
-                            if sub_skill_count >= 1:
-                                info(f"检测到 monorepo: skills/ 目录包含 {sub_skill_count} 个技能")
-                                skill_dirs.extend(sub_skill_candidates)
-                                continue
-                        # 检查根目录子目录是否包含技能（2+ 个判定为 monorepo）
-                        root_sub_skills = []
-                        for item in repo_dir.iterdir():
-                            if item.is_dir() and not item.name.startswith(".") and item.name not in exclude_dirs:
-                                if (item / "SKILL.md").exists():
-                                    root_sub_skills.append(item)
-                        if len(root_sub_skills) >= 2:
-                            info(f"检测到 monorepo: 根目录包含 {len(root_sub_skills)} 个子技能")
-                            skill_dirs.extend(root_sub_skills)
-                            continue
-
-                # 特殊处理2：检查是否为多技能容器子目录（如 skills/）
-                # 注意：如果是 skills/ 目录，且已在"特殊处理1"中处理过，跳过
-                if location.name == "skills" and location.parent == repo_dir:
-                    continue
-                # 检测子目录下是否包含 3+ 个技能（多技能容器）
-                sub_skill_count = 0
-                sub_skill_candidates = []
-                for item in location.iterdir():
-                    if item.is_dir() and item.name not in exclude_dirs:
-                        if (item / "SKILL.md").exists():
-                            sub_skill_count += 1
-                            sub_skill_candidates.append(item)
-
-                MULTI_SKILL_THRESHOLD = 3
-                if sub_skill_count >= MULTI_SKILL_THRESHOLD:
-                    info(f"检测到多技能子目录: {location.name} (包含 {sub_skill_count} 个子技能)")
-                    skill_dirs.extend(sub_skill_candidates)
-                    continue
-
-                for item in location.iterdir():
-                    # 允许 .claude 目录（多技能仓库结构），跳过其他隐藏目录
-                    if item.is_dir() and (not item.name.startswith(".") or item.name == ".claude"):
-                        # 排除非技能目录
-                        if item.name in exclude_dirs:
-                            continue
-                        # 检查是否包含 SKILL.md 或 .md 文件
-                        has_skill = (item / "SKILL.md").exists() or list(item.glob("*.md"))
-                        if has_skill:
-                            skill_dirs.append(item)
-
-        # 回退机制1：递归深度扫描（支持任意深度嵌套的子技能）
-        if not skill_dirs:
-            recursive_results = GitHubHandler._recursive_skill_scan(repo_dir, max_depth=5)
-            if recursive_results:
-                # 按深度排序，优先选择较浅的技能
-                recursive_results.sort(key=lambda x: x["relative_path"].count('/'))
-                skill_dirs = [r["path"] for r in recursive_results]
-                info(f"递归扫描: 发现 {len(skill_dirs)} 个深层子技能")
-
-        # 回退机制2：如果仍未找到技能，检查单层子目录（原有逻辑）
-        if not skill_dirs:
-            fallback_skills = []
-            for item in repo_dir.iterdir():
-                if item.is_dir() and not item.name.startswith(".") and item.name not in exclude_dirs:
-                    if (item / "SKILL.md").exists():
-                        fallback_skills.append(item)
-            if fallback_skills:
-                info(f"回退检测: 发现 {len(fallback_skills)} 个子技能")
-                skill_dirs.extend(fallback_skills)
-
-        return skill_dirs
-
 
 # =============================================================================
 # 共享逻辑 (Shared Logic)
 # =============================================================================
 
-def _extract_repo_from_url(github_url: str) -> Optional[str]:
-    """从 GitHub URL 提取 user/repo 格式
-
-    Returns:
-        "user/repo" 格式的字符串，失败返回 None
-    """
-    author, repo = SkillInstaller._extract_github_info(github_url)
-    if author and repo:
-        return f"{author}/{repo}"
-    return None
+# _extract_repo_from_url 已删除（功能已迁移到 clone_manager.py）
 
 def _filter_skills_by_intent(
     skill_dirs: List[Path],
@@ -2626,167 +1471,8 @@ def _filter_skills_by_intent(
     return skill_dirs, None
 
 
-def _dual_path_skill_check(github_url: str) -> Tuple[bool, str, List[str]]:
-    """
-    统一的技能判定 (合并后：使用 RemoteSkillAnalyzer)
-
-    判决规则:
-    - 判定为技能项目 → 继续 clone
-    - 判定为非技能项目 → 拒绝安装
-    - 预检超时/失败 → 降级到 clone
-
-    Returns:
-        (should_proceed, reason, sources)
-        - should_proceed: True=继续clone, False=拒绝安装
-        - reason: 判定原因
-        - sources: 成功的判定源 ["analyzer", "fallback"]
-    """
-    from urllib.parse import urlparse
-
-    # 提取 user/repo
-    parsed = urlparse(github_url)
-    if "github.com" not in parsed.netloc:
-        return True, "非 GitHub URL，跳过预检", ["fallback"]
-
-    repo = _extract_repo_from_url(github_url)
-    if not repo:
-        return True, "无法解析仓库，跳过预检", ["fallback"]
-
-    # 使用统一的分析器
-    analyzer = RemoteSkillAnalyzer(repo)
-    is_skill, reason = analyzer.check_is_skill_repo()
-
-    # 判定规则
-    if is_skill is True:
-        # 判定为技能 → 继续
-        return True, reason, ["analyzer"]
-    elif is_skill is False:
-        # 判定为非技能 → 拒绝
-        return False, reason, []
-    else:
-        # is_skill is None，预检超时/失败 → 降级到 clone
-        return True, reason, ["fallback"]
-
-
-def _process_github_source(
-    github_url: str,
-    temp_dir: Path,
-    skill_name: Optional[str] = None,
-    batch: bool = False,
-    subpath: Optional[str] = None,
-    use_cache: bool = True,
-    force_refresh: bool = False
-) -> Tuple[List[Path], Optional[str]]:
-    """
-    统一的 GitHub 源处理逻辑
-
-    Args:
-        github_url: GitHub 仓库 URL
-        temp_dir: 临时目录
-        skill_name: 指定的子技能名称
-        batch: 是否批量处理
-        subpath: 仓库内的子路径（如 "scientific-skills"）
-        use_cache: 是否使用缓存
-        force_refresh: 强制刷新缓存
-
-    Returns:
-        (待处理的技能列表, 错误信息)
-    """
-    # === 方案0: 双路技能判定 ===
-    # 在没有子路径时进行预检（检查是否为技能仓库）
-    if not subpath:
-        should_proceed, reason, sources = _dual_path_skill_check(github_url)
-
-        if not should_proceed:
-            # 拒绝安装
-            print("=" * 60)
-            print("❌ 拒绝安装：这不是技能项目")
-            print("=" * 60)
-            print()
-            print(f"检测原因: {reason}")
-            print()
-            print("系统不支持安装工具项目。")
-            return [], "不是技能项目"
-
-        info(f"预检通过 ({'+'.join(sources)}): {reason}")
-
-    # === 方案1: 子技能预检机制 ===
-    # 当指定了子技能名称时，先通过 API 预检，避免无效克隆
-    if skill_name:
-        info(f"预检子技能: {skill_name}")
-        # 从 URL 提取 repo 格式 (user/repo)
-        repo = _extract_repo_from_url(github_url)
-        if repo:
-            try:
-                analyzer = RemoteSkillAnalyzer(repo)
-                repo_info = analyzer.analyze()
-                available_skills = {s["name"] for s in repo_info.get("skills", [])}
-
-                if skill_name not in available_skills:
-                    available_list = ", ".join(sorted(available_skills))
-                    return [], f"子技能不存在: {skill_name}\n可用子技能: {available_list}"
-
-                info(f"预检通过: {skill_name} 存在")
-            except Exception as e:
-                # 预检失败（网络问题等），回退到直接克隆
-                warn(f"预检失败，继续克隆: {e}")
-
-    # === 方案2B: 缓存机制 ===
-    if use_cache:
-        cache_ok, cache_dir, cache_msg = RepoCacheManager.get_or_clone(
-            github_url,
-            force_refresh=force_refresh
-        )
-        if cache_ok:
-            info(cache_msg)
-            # 从缓存复制到临时目录
-            repo_dir = temp_dir / "repo"
-            if repo_dir.exists():
-                shutil.rmtree(repo_dir)
-            shutil.copytree(cache_dir, repo_dir)
-        else:
-            return [], cache_msg
-    else:
-        # 不使用缓存，直接克隆
-        clone_ok, repo_dir = GitHubHandler.clone_repo(github_url, temp_dir / "repo")
-        if not clone_ok:
-            return [], "仓库不存在或路径错误\n提示: 查看 docs/skills-mapping.md 确认正确的仓库路径"
-
-    # 如果有子路径，定位到子目录
-    scan_dir = repo_dir
-    if subpath:
-        scan_dir = repo_dir / subpath
-        if not scan_dir.exists():
-            return [], f"子路径不存在: {subpath}"
-        info(f"定位到子路径: {subpath}")
-
-    # 提取所有技能
-    skill_dirs = GitHubHandler.extract_skills(scan_dir)
-    if not skill_dirs:
-        # 只有在没有子路径时才检查根目录是否为工具项目
-        # 如果指定了子路径，说明用户知道技能的具体位置
-        if not subpath:
-            # 检查是否为工具项目
-            is_skill, reason = ProjectValidator.is_skill_repo_root(repo_dir)
-            if not is_skill:
-                # 输出拒绝信息
-                repo_name = github_url.split('/')[-1] if '/' in github_url else github_url
-                print("=" * 60)
-                print("❌ 拒绝安装：这不是技能项目")
-                print("=" * 60)
-                print()
-                print(f"检测原因: {reason}")
-                print(f"仓库: {repo_name}")
-                print()
-                print("系统不支持安装工具项目。")
-                print("请确认：")
-                print("  1. 是否为工具/库？请使用 pip/npm/cargo 等安装")
-                print("  2. 确实需要作为技能？请手动转换后安装")
-                return [], "不是技能项目"
-        return [], "未找到技能目录"
-
-    # 根据意图过滤
-    return _filter_skills_by_intent(skill_dirs, skill_name, batch)
+# _dual_path_skill_check 和 _process_github_source 已删除
+# GitHub 源处理现在统一使用 clone_manager._process_github_source
 
 
 def _process_input_source(
@@ -2814,7 +1500,8 @@ def _process_input_source(
         (待处理的技能列表, 错误信息)
     """
     if input_type == "github":
-        return _process_github_source(input_source, temp_dir, skill_name, batch, subpath, force_refresh=force_refresh)
+        # GitHub 源需要使用独立工具处理
+        return [], f"GitHub 源需要先使用 clone_manager 处理\n请运行: python bin/clone_manager.py clone {input_source}"
 
     elif input_type == "local":
         return [Path(input_source)], None
@@ -2876,12 +1563,126 @@ class SkillPackHandler:
 # =============================================================================
 
 class SkillSearcher:
-    """技能搜索器 - 支持关键词、描述、标签搜索"""
+    """技能搜索器 - 支持关键词、描述、标签搜索
+
+    缓存策略：
+    - _skill_index: 缓存的技能索引数据
+    - _index_mtime: 索引构建时的目录修改时间
+    - 自动检测技能目录变化并失效缓存
+    """
+
+    # 类变量：索引缓存
+    _skill_index: Optional[Dict[str, Dict]] = None
+    _index_mtime: Optional[float] = None
+
+    @staticmethod
+    def _get_dir_mtime() -> Optional[float]:
+        """获取技能目录的最新修改时间"""
+        if not CLAUDE_SKILLS_DIR.exists():
+            return None
+        try:
+            # 获取目录本身的 mtime
+            return CLAUDE_SKILLS_DIR.stat().st_mtime
+        except Exception:
+            return None
+
+    @staticmethod
+    def _build_skill_index() -> Dict[str, Dict]:
+        """
+        构建技能搜索索引
+
+        Returns:
+            {
+                "skills": {
+                    "skill_name": {
+                        "name": "技能名",
+                        "folder": "文件夹名",
+                        "description": "描述(小写)",
+                        "tags": ["标签列表"],
+                        "category": "类别(小写)",
+                        "keywords_cn": ["中文关键词"],
+                        "description_raw": "原始描述"
+                    }
+                },
+                "mtime": 目录修改时间
+            }
+        """
+        if not CLAUDE_SKILLS_DIR.exists():
+            return {"skills": {}, "mtime": 0}
+
+        skills = {}
+        for skill_dir in CLAUDE_SKILLS_DIR.iterdir():
+            if not skill_dir.is_dir():
+                continue
+
+            skill_md = skill_dir / "SKILL.md"
+            if not skill_md.exists():
+                continue
+
+            try:
+                with open(skill_md, "r", encoding="utf-8", errors="ignore") as f:
+                    frontmatter = SkillNormalizer.extract_frontmatter(f.read())
+
+                name = frontmatter.get("name", skill_dir.name)
+                description = frontmatter.get("description", "")
+                tags = frontmatter.get("tags", [])
+                category = frontmatter.get("category", "")
+                keywords_cn = frontmatter.get("keywords_cn", [])
+
+                # keywords_cn 可能是字符串或列表
+                if isinstance(keywords_cn, str):
+                    keywords_cn = [k.strip() for k in keywords_cn.split(",") if k.strip()]
+
+                skills[name] = {
+                    "name": name,
+                    "folder": skill_dir.name,
+                    "description": description.lower(),
+                    "tags": tags if isinstance(tags, list) else [tags],
+                    "category": category.lower(),
+                    "keywords_cn": keywords_cn,
+                    "description_raw": description
+                }
+            except Exception:
+                # 跳过读取失败的技能
+                continue
+
+        return {
+            "skills": skills,
+            "mtime": SkillSearcher._get_dir_mtime() or 0
+        }
+
+    @staticmethod
+    def _get_skill_index() -> Dict[str, Dict]:
+        """
+        获取技能索引（带缓存）
+
+        自动检测目录变化并重建索引
+        """
+        current_mtime = SkillSearcher._get_dir_mtime()
+
+        # 检查缓存是否有效
+        if (SkillSearcher._skill_index is not None and
+            SkillSearcher._index_mtime is not None and
+            current_mtime is not None and
+            SkillSearcher._index_mtime >= current_mtime):
+            # 缓存有效
+            return SkillSearcher._skill_index
+
+        # 缓存失效或不存在，重建索引
+        SkillSearcher._skill_index = SkillSearcher._build_skill_index()
+        SkillSearcher._index_mtime = current_mtime
+        return SkillSearcher._skill_index
+
+    @staticmethod
+    def invalidate_cache() -> None:
+        """手动失效缓存（用于安装/卸载技能后）"""
+        SkillSearcher._skill_index = None
+        SkillSearcher._index_mtime = None
 
     @staticmethod
     def search_skills(keywords: List[str], limit: int = 10) -> List[Dict]:
         """
-        搜索技能
+        搜索技能（使用缓存索引）
 
         Args:
             keywords: 搜索关键词列表
@@ -2893,30 +1694,21 @@ class SkillSearcher:
         if not CLAUDE_SKILLS_DIR.exists():
             return []
 
+        # 使用缓存索引（首次或目录变化时自动重建）
+        index_data = SkillSearcher._get_skill_index()
+        skills = index_data["skills"]
+
         results = []
         # 加载使用频率数据
         usage_data = SkillSearcher._load_usage_data()
 
-        for skill_dir in sorted(CLAUDE_SKILLS_DIR.iterdir()):
-            if not skill_dir.is_dir():
-                continue
-
-            skill_md = skill_dir / "SKILL.md"
-            if not skill_md.exists():
-                continue
-
-            # 读取 frontmatter
-            with open(skill_md, "r", encoding="utf-8", errors="ignore") as f:
-                frontmatter = SkillNormalizer.extract_frontmatter(f.read())
-
-            name = frontmatter.get("name", skill_dir.name)
-            description = frontmatter.get("description", "").lower()
-            tags = frontmatter.get("tags", [])
-            category = frontmatter.get("category", "").lower()
-            keywords_cn = frontmatter.get("keywords_cn", [])
-            # keywords_cn 可能是字符串或列表
-            if isinstance(keywords_cn, str):
-                keywords_cn = [k.strip() for k in keywords_cn.split(",") if k.strip()]
+        # 遍历索引数据（无需读取文件）
+        for name, skill_data in skills.items():
+            description = skill_data["description"]
+            tags = skill_data["tags"]
+            category = skill_data["category"]
+            keywords_cn = skill_data["keywords_cn"]
+            folder = skill_data["folder"]
 
             # 计算匹配分数
             total_score = 0
@@ -2987,10 +1779,10 @@ class SkillSearcher:
             if total_score > 0:
                 results.append({
                     "name": name,
-                    "folder": skill_dir.name,
+                    "folder": folder,
                     "score": total_score,
                     "reasons": match_reasons,
-                    "description": frontmatter.get("description", "无描述")
+                    "description": skill_data["description_raw"]
                 })
 
         # 按分数降序排序
@@ -3036,6 +1828,76 @@ class SkillSearcher:
                 json.dump(usage_data, f, ensure_ascii=False, indent=2)
         except Exception as e:
             warn(f"记录使用失败: {e}")
+
+
+# =============================================================================
+# 威胁分析辅助函数
+# =============================================================================
+
+def _build_threat_analysis_prompt(threatened_skills: List[Dict]) -> str:
+    """
+    构建 LLM 二次确认提示词
+
+    Args:
+        threatened_skills: 威胁技能列表，每项包含 name, scan_result
+
+    Returns:
+        格式化的分析提示词
+    """
+    from datetime import datetime
+
+    lines = []
+    lines.append(f"# 安全扫描二次确认分析")
+    lines.append(f"\n扫描时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    lines.append(f"威胁技能数量: {len(threatened_skills)}")
+    lines.append("\n---")
+
+    for i, threat in enumerate(threatened_skills, 1):
+        scan_result = threat["scan_result"]
+        skill_name = threat["name"]
+        severity = scan_result.get("severity", "UNKNOWN")
+        threats = scan_result.get("threats", [])
+
+        lines.append(f"\n## {i}. {skill_name}")
+        lines.append(f"**严重级别**: {severity}")
+        lines.append(f"**威胁数量**: {len(threats)}")
+
+        if threats:
+            lines.append("\n**威胁详情**:")
+            for t in threats[:10]:  # 最多显示 10 个
+                title = t.get("title", "Unknown")
+                t_severity = t.get("severity", "UNKNOWN")
+                file = t.get("file", "")
+                line = t.get("line", "")
+                location = f"{file}:{line}" if file and line else (file or "")
+
+                lines.append(f"  - [{t_severity}] {title}")
+                if location:
+                    lines.append(f"    位置: {location}")
+
+    lines.append("\n---")
+    lines.append("\n## 判断标准")
+    lines.append("\n### 误报特征（允许安装）:")
+    lines.append("- 技能描述包含工作流设计、开发工具、质量控制")
+    lines.append("- 标准文档结构、模板文件")
+    lines.append("- 测试代码、示例代码")
+    lines.append("- 正常的 Python/JavaScript 代码结构")
+
+    lines.append("\n### 确认威胁特征（应卸载）:")
+    lines.append("- 明显的恶意代码（如 eval/exec 拼接用户输入）")
+    lines.append("- 攻击载荷（如 shell 命令注入模式）")
+    lines.append("- 敏感数据窃取（如上传本地文件到外部服务器）")
+    lines.append("- 网络后门、反向 Shell")
+    lines.append("- 加密货币挖矿代码")
+
+    lines.append("\n## 操作建议")
+    lines.append("\n对于确认威胁的技能，请执行:")
+    lines.append("```bash")
+    for threat in threatened_skills:
+        lines.append(f"python bin/skill_manager.py uninstall {threat['name']}")
+    lines.append("```")
+
+    return "\n".join(lines)
 
 
 # =============================================================================
@@ -3153,6 +2015,14 @@ def main():
         action="store_true",
         help="强制刷新仓库缓存（重新克隆）"
     )
+    install_parser.add_argument(
+        "--author",
+        help="GitHub 作者名（用于构建技能名称）"
+    )
+    install_parser.add_argument(
+        "--repo",
+        help="GitHub 仓库名（用于构建技能名称）"
+    )
 
     # record 命令 - 记录技能使用
     record_parser = subparsers.add_parser("record", help="记录技能使用（用于搜索加权）")
@@ -3161,23 +2031,27 @@ def main():
         help="技能名称"
     )
 
-    # cache 命令 - 管理仓库缓存
-    cache_parser = subparsers.add_parser("cache", help="管理仓库缓存")
-    cache_parser.add_argument(
-        "action",
-        choices=["list", "clear", "update"],
-        help="操作: list=列出缓存, clear=清理缓存, update=更新指定缓存"
+    # cache 命令 - 仓库缓存管理（路由到 clone_manager）
+    cache_parser = subparsers.add_parser("cache", help="仓库缓存管理")
+    cache_subparsers = cache_parser.add_subparsers(dest="cache_command", help="缓存操作")
+
+    cache_subparsers.add_parser("list", help="列出所有缓存")
+
+    clear_cache_parser = cache_subparsers.add_parser("clear", help="清理缓存")
+    clear_cache_parser.add_argument(
+        "--older-than", type=int,
+        help="只清理超过指定小时数的缓存"
     )
-    cache_parser.add_argument(
-        "url",
-        nargs="?",
-        help="仓库 URL（用于 update 操作）"
-    )
-    cache_parser.add_argument(
-        "--older-than", "-o",
-        type=int,
-        default=None,
-        help="清理超过指定小时数的缓存（用于 clear 操作），默认全部清理"
+
+    update_cache_parser = cache_subparsers.add_parser("update", help="更新指定仓库缓存")
+    update_cache_parser.add_argument("url", help="GitHub 仓库 URL")
+
+    # verify-config 命令
+    verify_parser = subparsers.add_parser("verify-config", help="验证配置文件")
+    verify_parser.add_argument(
+        "--fix",
+        action="store_true",
+        help="自动修复常见配置问题"
     )
 
     args = parser.parse_args()
@@ -3285,7 +2159,8 @@ def main():
     elif args.command == "uninstall":
         header("技能卸载器")
 
-        skill_names = args.name
+        # 规范化技能名为小写（修复大小写不匹配问题）
+        skill_names = [name.lower() for name in args.name]
         success_count = 0
         failed_list = []
 
@@ -3322,8 +2197,15 @@ def main():
 
             # 5. 删除目录（原子操作：文件 + 数据库）
             try:
+                # 5.0 只读文件处理器（Windows 兼容）
+                def _remove_readonly(func, path, excinfo):
+                    """处理 Windows 只读文件删除问题"""
+                    import os
+                    os.chmod(path, 0o777)
+                    func(path)
+
                 # 5.1 删除文件
-                shutil.rmtree(skill_dir)
+                shutil.rmtree(skill_dir, onerror=_remove_readonly)
 
                 # 5.2 从数据库移除（使用 folder_name）
                 db_remove_success = SkillInstaller._remove_skill_from_db(folder_name)
@@ -3340,6 +2222,9 @@ def main():
 
         # 汇总结果
         print()
+        # 如果有成功删除的技能，失效搜索索引缓存
+        if success_count > 0:
+            SkillSearcher.invalidate_cache()
         info(f"批量删除完成: 成功 {success_count}/{len(skill_names)}")
         if failed_list:
             error(f"失败: {', '.join(failed_list)}")
@@ -3357,37 +2242,45 @@ def main():
         temp_dir.mkdir(parents=True, exist_ok=True)
 
         skills_to_process = []
+        scan_results = None
+        threatened_skills = []
 
-        # 2. 根据输入类型处理
-        skills_to_process, error_msg = _process_input_source(
-            input_source,
-            input_type,
-            temp_dir,
-            args.skill_name,
-            args.batch,
-            subpath,
-            force_refresh=getattr(args, "refresh_cache", False)
-        )
-
-        if error_msg:
-            error(f"{error_msg}，退出")
+        # 2. 对于 GitHub 源，需要先使用独立工具处理
+        if input_type == "github":
+            error("GitHub 源需要使用独立工具处理，请按以下步骤操作:")
+            print()
+            print("步骤 1: 克隆仓库")
+            print(f"  python bin/clone_manager.py clone {input_source}")
+            print()
+            print("步骤 2: 安全扫描（可选）")
+            print(f"  python bin/security_scanner.py scan-all")
+            print()
+            print("步骤 3: 安装技能")
+            print(f"  python bin/skill_manager.py install <本地路径>")
+            print()
             return 1
 
-        # 2.5 对于 GitHub 仓库，提取 author 和 repo 并检查是否是技能仓库
-        github_author = None
-        github_repo = None
-        if input_type == "github":
+        else:
+            # 非 GitHub 源，使用传统处理方式
+            skills_to_process, error_msg = _process_input_source(
+                input_source, input_type, temp_dir, args.skill_name,
+                args.batch, subpath,
+                force_refresh=getattr(args, "refresh_cache", False)
+            )
+            if error_msg:
+                error(f"{error_msg}，退出")
+                return 1
+
+        if not skills_to_process:
+            error("没有待处理的技能")
+            return 1
+
+        # 2.5 提取 GitHub 信息（优先使用命令行参数）
+        github_author = getattr(args, "author", None)
+        github_repo = getattr(args, "repo", None)
+        if not github_author and input_type == "github":
             github_author, github_repo = SkillInstaller._extract_github_info(str(input_source))
             info(f"GitHub: {github_author}/{github_repo}")
-
-            # 只有在没有子路径时才验证根目录
-            # 如果指定了子路径，说明用户知道技能的具体位置，跳过根目录验证
-            if not subpath:
-                repo_root = temp_dir / "repo"
-                if repo_root.exists():
-                    if not ProjectValidator.validate_root_repo(repo_root, args.source, False):
-                        error("这不是一个技能仓库，退出")
-                        return 1
 
         # 输出处理信息
         if args.skill_name:
@@ -3395,12 +2288,9 @@ def main():
         elif len(skills_to_process) == SINGLE_SKILL_THRESHOLD:
             info(f"找到 1 个技能，自动安装")
         else:
-            # 多技能自动批量安装（无需 --batch 参数）
             info(f"检测到 {len(skills_to_process)} 个技能，自动批量安装")
-            if not args.batch:
-                info(f"(提示: 使用 --skill <name> 只安装特定子技能)")
 
-        # 3. 处理每个技能
+        # 3. 处理每个技能（格式转换）
         converted_skills = []
 
         for skill_dir in skills_to_process:
@@ -3437,7 +2327,7 @@ def main():
         if converted_skills:
             info(f"\n安装 {len(converted_skills)} 个技能...")
 
-            results = SkillInstaller.batch_install(converted_skills, args.force, github_author, github_repo)
+            results = batch_install(converted_skills, args.force, github_author, github_repo, scan_results=scan_results)
 
             # 打印结果
             if results.get("success"):
@@ -3458,19 +2348,21 @@ def main():
                 for item in results["failed"]:
                     print(f"  [X] {item['name']}: {item['message']}")
 
-        # 5. 清理临时文件（Windows 安全处理）
-        # 先清理旧的 installer_* 目录
+            # 处理威胁技能（需要二次分析）
+            if results.get("threatened_skills"):
+                print()
+                print(f"⚠️  安全扫描发现 {len(results['threatened_skills'])} 个威胁技能，已安装但需要 LLM 二次分析")
+
+        # 5. 清理临时文件
         old_cleaned = cleanup_old_install_dirs(max_age_hours=24)
         if old_cleaned > 0:
             info(f"清理了 {old_cleaned} 个旧临时目录")
 
         if temp_dir.exists():
             try:
-                # Windows: 先尝试删除 .git 目录（可能只读）
                 git_dir = temp_dir / "repo" / ".git"
                 if git_dir.exists():
                     try:
-                        # 递归修改权限后删除 (使用 0o755 而非 0o777)
                         for root, dirs, files in os.walk(git_dir):
                             for d in dirs:
                                 os.chmod(os.path.join(root, d), 0o755)
@@ -3478,7 +2370,7 @@ def main():
                                 os.chmod(os.path.join(root, f), 0o644)
                         shutil.rmtree(git_dir)
                     except Exception:
-                        pass  # 忽略 .git 删除失败
+                        pass
                 shutil.rmtree(temp_dir, ignore_errors=True)
                 info(f"清理临时文件")
             except Exception as e:
@@ -3498,49 +2390,116 @@ def main():
         return 0
 
     elif args.command == "cache":
-        header("缓存管理")
+        # cache 命令已迁移到 clone_manager
+        error("cache 命令已迁移到 clone_manager")
+        print()
+        print("请使用以下命令:")
+        print(f"  python bin/clone_manager.py list-cache")
+        print(f"  python bin/clone_manager.py clear-cache")
+        print(f"  python bin/clone_manager.py clone <url> --force")
+        print()
+        return 1
 
-        if args.action == "list":
-            caches = RepoCacheManager.list_cache()
-            if not caches:
-                info("无缓存")
-                return 0
+    elif args.command == "verify-config":
+        header("配置验证")
 
-            print(f"\n共 {len(caches)} 个缓存:\n")
-            for i, cache in enumerate(caches, 1):
-                print(f"  {i}. {cache['url']}")
-                print(f"     大小: {cache['size_mb']} MB")
-                print(f"     缓存时间: {cache['cached_at']}")
-                if cache['last_updated'] != 'Never':
-                    print(f"     更新时间: {cache['last_updated']}")
-                print()
+        result = {
+            "valid": True,
+            "issues": [],
+            "fixed": []
+        }
 
-        elif args.action == "clear":
-            if args.older_than is None:
-                print("确认清理所有缓存? (y/N): ", end="")
-                confirm = input()
-                if confirm.lower() != 'y':
-                    info("已取消")
-                    return 0
-            else:
-                info(f"清理超过 {args.older_than} 小时的缓存")
+        config_file = BASE_DIR / ".claude" / "config" / "config.yml"
 
-            result = RepoCacheManager.clear_cache(args.older_than)
-            success(f"清理完成: 清理 {result['cleared']} 个, 保留 {result['kept']} 个")
+        # 检查配置文件是否存在
+        if not config_file.exists():
+            result["valid"] = False
+            result["issues"].append("配置文件不存在: .claude/config/config.yml")
 
-        elif args.action == "update":
-            if not args.url:
-                error("请指定要更新的仓库 URL")
-                return 1
+            if getattr(args, 'fix', False):
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                default_config = {
+                    "git": {
+                        "proxies": [
+                            "https://ghp.ci/{repo}",
+                            "https://ghproxy.net/{repo}"
+                        ],
+                        "ssl_verify": True
+                    },
+                    "raw": {
+                        "proxies": [
+                            "https://ghp.ci/{path}",
+                            "https://raw.fastgit.org/{path}"
+                        ]
+                    },
+                    "security": {
+                        "scan_enabled": True,
+                        "scan_on_install": True,
+                        "allowed_severity": ["SAFE", "LOW"],
+                        "engines": {
+                            "static": True,
+                            "behavioral": True,
+                            "llm": False,
+                            "virustotal": False
+                        }
+                    }
+                }
+                with open(config_file, "w", encoding="utf-8") as f:
+                    yaml.dump(default_config, f, allow_unicode=True)
+                result["fixed"].append("已创建默认配置文件")
 
-            info(f"更新缓存: {args.url}")
-            ok, msg = RepoCacheManager.update_cache(args.url)
-            if ok:
-                success(msg)
-            else:
-                error(msg)
+        # 验证配置内容
+        else:
+            try:
+                config = load_config(use_cache=False)
 
-        return 0
+                # 检查必需字段
+                required_sections = ["git", "raw"]
+                for section in required_sections:
+                    if section not in config:
+                        result["issues"].append(f"缺少配置节: {section}")
+                        result["valid"] = False
+
+                # 检查 proxies 格式
+                if "git" in config and "proxies" in config["git"]:
+                    proxies = config["git"]["proxies"]
+                    if not isinstance(proxies, list) or not proxies:
+                        result["issues"].append("git.proxies 必须是非空列表")
+                        result["valid"] = False
+
+                        if getattr(args, 'fix', False):
+                            config["git"]["proxies"] = [
+                                "https://ghp.ci/{repo}",
+                                "https://ghproxy.net/{repo}"
+                            ]
+                            result["fixed"].append("已修复 git.proxies")
+
+                # 如果有修复，写回文件
+                if getattr(args, 'fix', False) and result["fixed"]:
+                    with open(config_file, "w", encoding="utf-8") as f:
+                        yaml.dump(config, f, allow_unicode=True)
+                    result["valid"] = True
+
+            except Exception as e:
+                result["valid"] = False
+                result["issues"].append(f"配置解析失败: {e}")
+
+        if result["valid"]:
+            success("配置文件有效")
+        else:
+            error("配置文件存在问题")
+
+        if result["issues"]:
+            print("\n发现问题:")
+            for issue in result["issues"]:
+                print(f"  [!] {issue}")
+
+        if result["fixed"]:
+            print("\n已修复:")
+            for fix in result["fixed"]:
+                print(f"  [OK] {fix}")
+
+        return 0 if result["valid"] else 1
 
     else:
         parser.print_help()

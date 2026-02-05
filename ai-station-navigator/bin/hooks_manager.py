@@ -34,6 +34,11 @@ _lib_dir = Path(__file__).parent.parent / "lib"
 if _lib_dir.exists():
     sys.path.insert(0, str(_lib_dir))
 
+# 添加 bin 目录到 sys.path（用于导入 security_scanner）
+_bin_dir = Path(__file__).parent
+if _bin_dir.exists() and str(_bin_dir) not in sys.path:
+    sys.path.insert(0, str(_bin_dir))
+
 # =============================================================================
 # 日志工具
 # =============================================================================
@@ -90,8 +95,6 @@ class HookType(Enum):
     ON_DELIVERY = "on_delivery"             # 交付完成后触发
     ON_DISK_WARNING = "on_disk_warning"     # 磁盘空间警告时触发
     ON_ERROR = "on_error"                  # 发生错误时触发
-    ON_SKILL_INSTALL = "on_skill_install"   # 技能安装后触发
-    ON_SKILL_UNINSTALL = "on_skill_uninstall"  # 技能卸载后触发
     MANUAL = "manual"                      # 手动触发
 
 
@@ -236,7 +239,7 @@ class HooksManager:
             Hook(
                 name="cleanup_workspace",
                 hook_type=HookType.ON_DELIVERY,
-                description="清理 workspace/current/ 目录",
+                description="清理 workspace/ 目录",
                 action=self._action_cleanup_workspace
             ),
             save_state=False
@@ -548,28 +551,14 @@ class HooksManager:
                 "message": f"创建快照失败: {str(e)}"
             }
 
-    def _action_sync_skill_install_status(self) -> Dict[str, Any]:
-        """[DEPRECATED] 技能安装后同步数据库状态
 
-        注意：此 Hook 已废弃，数据库同步已移至 skill_manager.py 直接处理。
-        保留此方法仅为兼容性，不应再被调用。
-        """
-        warn("sync_skill_install_status Hook 已废弃，请使用 skill_manager.py 直接同步")
+    def _action_refresh_skills(self) -> Dict[str, Any]:
+        """会话开始时刷新技能数据（占位实现）"""
+        # 这个 Hook 目前是占位符，可以后续添加实际逻辑
+        # 例如：刷新技能索引缓存等
         return {
-            "success": False,
-            "message": "此 Hook 已废弃，数据库同步已移至 skill_manager.py"
-        }
-
-    def _action_sync_skill_uninstall_status(self) -> Dict[str, Any]:
-        """[DEPRECATED] 技能卸载后同步数据库状态
-
-        注意：此 Hook 已废弃，数据库同步已移至 skill_manager.py 直接处理。
-        保留此方法仅为兼容性，不应再被调用。
-        """
-        warn("sync_skill_uninstall_status Hook 已废弃，请使用 skill_manager.py 直接同步")
-        return {
-            "success": False,
-            "message": "此 Hook 已废弃，数据库同步已移至 skill_manager.py"
+            "status": "success",
+            "message": "技能数据刷新完成"
         }
 
     # ======================================================================

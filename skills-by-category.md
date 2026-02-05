@@ -1,12 +1,16 @@
 # Claude Skills 功能分类汇总
 
+> **📋 数据源声明**：本文档是技能库的**主数据源 (Master Source)**，所有技能仓库和子技能条目在此维护。
+>
+> **🔗 同步关系**：`docs/skills-mapping.md` 从本文档自动派生，用于子技能路由查询。两文档必须保持同步。
+>
 > **⚠️ 免责声明**：以下链接仅供 Skills 安装测试，具体用途、安全性和限制请务必查阅对应仓库说明。本文档仅作功能汇总，版权归属原项目作者。
 
 <div align="center">
 
 | 📅 分析日期 | 📦 仓库总数 | 🧩 技能总数 |
 | :---: | :---: | :---: |
-| 2026-01-28 | 18 | ~329+ |
+| 2026-02-03 | 15 | 120 |
 
 </div>
 
@@ -15,14 +19,12 @@
 | 章节 | 🏷️ 分类 | 📊 技能数 |
 | :---: | :--- | ---: |
 | [01](#一开发工作流-development-workflow) | 🛠️ 开发工作流 | 14 |
-| [02](#二科学计算与研究-scientific-computing) | 🧬 科学计算与研究 | 140 |
-| [03](#三文本处理与写作-text--writing) | ✍️ 文本处理与写作 | 19 |
-| [04](#四创业与商业-startup--business) | 💼 创业与商业 | 26 |
-| [05](#五笔记与知识管理-note-taking--knowledge) | 📓 笔记与知识管理 | 6 |
-| [06](#六prompt工程与技能管理-skill-management) | 🤖 Prompt工程与管理 | 4 |
-| [07](#七专业领域-professional-domains) | ⚖️ 专业领域 | 61 |
-| [08](#八综合工具集-comprehensive-toolkits) | 🧰 综合工具集 | 32 |
-| [09](#九开发工具集-development-toolkit) | 💻 开发工具集 | 27 |
+| [02](#二文本处理与写作-text--writing) | ✍️ 文本处理与写作 | 32 |
+| [03](#三创业与商业-startup--business) | 💼 创业与商业 | 26 |
+| [04](#四笔记与知识管理-note-taking--knowledge) | 📓 笔记与知识管理 | 6 |
+| [05](#五prompt工程与技能管理-skill-management) | 🤖 Prompt工程与管理 | 4 |
+| [06](#六专业领域-professional-domains) | ⚖️ 专业领域 | 30 |
+| [07](#七综合工具集-comprehensive-toolkits) | 🧰 综合工具集 | 14 |
 
 ---
 
@@ -52,81 +54,7 @@
 
 ---
 
-## 二、科学计算与研究 (Scientific Computing)
-
-### 📦 [K-Dense-AI/claude-scientific-skills](https://github.com/K-Dense-AI/claude-scientific-skills)
-**简介**：最全面的科学计算工具集，覆盖生物、化学、物理、数据科学等多学科领域。
-
-#### 🧬 生物信息与基因组学
-| 技能 | 描述 | 技能 | 描述 |
-| :--- | :--- | :--- | :--- |
-| `adaptyv` | 蛋白质自动化测试云实验室 | `alphafold-database` | AlphaFold 蛋白质结构数据库 |
-| `anndata` | 单细胞分析注释矩阵 | `arboreto` | 基因调控网络推断 |
-| `benchling-integration` | 研发平台(DNA/蛋白/细胞) | `biopython` | 分子生物学综合工具包 |
-| `cellxgene-census` | 查询单细胞目录 | `clinvar-database` | 查询变异临床意义 |
-| `cosmic-database` | 癌症突变数据库 | `deeptools` | NGS分析工具包 |
-| `dnanexus-integration` | 云基因组平台集成 | `ena-database` | 欧洲核苷酸档案访问 |
-| `ensembl-database` | 基因组数据库查询 | `esm` | 蛋白质语言模型工具包 |
-| `etetoolkit` | 系统发育树工具包 | `flowio` | 解析 FCS 流式细胞术文件 |
-| `gene-database` | NCBI Gene 查询 | `geniml` | 基因组区间机器学习 |
-| `geo-database` | NCBI GEO 基因表达数据 | `gtars` | Rust 高性能基因组分析 |
-| `kegg-database` | KEGG 通路分析 | `pydeseq2` | 差异基因表达分析 |
-| `pysam` | 基因组文件处理 (BAM/VCF) | `scanpy` | 单细胞 RNA-seq 分析 |
-| `scikit-bio` | 生物数据工具包 | `scvi-tools` | 单细胞组学深度生成模型 |
-| `string-database` | 蛋白质相互作用查询 | `uniprot-database` | UniProt 数据库访问 |
-
-#### 💊 化学、药物与代谢
-| 技能 | 描述 | 技能 | 描述 |
-| :--- | :--- | :--- | :--- |
-| `brenda-database` | 酶数据库访问 | `chembl-database` | 生物活性分子查询 |
-| `clinpgx-database` | 药物基因组学数据 | `cobrapy` | 基于约束的代谢建模 |
-| `datamol` | RDKit 的 Python 封装 | `deepchem` | 分子机器学习 |
-| `diffdock` | 分子对接预测 | `drugbank-database` | 药物信息分析 |
-| `fda-database` | OpenFDA API 查询 | `hmdb-database` | 人类代谢组数据库 |
-| `matchms` | 代谢组学谱相似性 | `medchem` | 药物化学过滤器 |
-| `metabolomics-workbench` | 代谢组学数据访问 | `molfeat` | 分子特征化工具 |
-| `opentargets-database` | 靶点-疾病关联查询 | `pubchem-database` | PubChem 化合物查询 |
-| `pyopenms` | 完整质谱分析平台 | `pytdc` | 药物发现数据集 |
-| `rdkit` | 化学信息学工具包 | `rowan` | 量子化学云平台 |
-| `zinc-database` | 可购买化合物数据库 | | |
-
-#### 🔭 物理、量子与工程
-| 技能 | 描述 | 技能 | 描述 |
-| :--- | :--- | :--- | :--- |
-| `astropy` | 天文学综合库 | `cirq` | Google 量子计算框架 |
-| `fluidsim` | 计算流体力学模拟 | `pennylane` | 量子机器学习框架 |
-| `pymatgen` | 材料科学工具包 | `qiskit` | IBM 量子计算框架 |
-| `qutip` | 量子物理模拟库 | `simpy` | 离散事件仿真框架 |
-
-#### 📊 数据科学与机器学习
-| 技能 | 描述 | 技能 | 描述 |
-| :--- | :--- | :--- | :--- |
-| `aeon` | 时间序列机器学习 | `dask` | 分布式计算框架 |
-| `datacommons-client` | 统计数据访问 | `exploratory-data-analysis` | 探索性数据分析 (EDA) |
-| `geopandas` | 地理空间矢量数据 | `matplotlib` | 基础绘图库 |
-| `networkx` | 网络分析与可视化 | `pandas/polars` | 数据处理库 |
-| `plotly/seaborn` | 数据可视化库 | `pymc-bayesian` | 贝叶斯建模 |
-| `pymoo` | 多目标优化框架 | `pytorch-lightning` | 深度学习框架 |
-| `scikit-learn` | 机器学习标准库 | `scikit-survival` | 生存分析工具包 |
-| `shap` | 模型可解释性 | `statsmodels` | 统计模型库 |
-| `sympy` | 符号数学计算 | `torch-geometric` | 图神经网络 (PyG) |
-| `transformers` | Hugging Face 模型 | `umap-learn` | 降维算法 |
-
-#### 📝 科研辅助与写作
-| 技能 | 描述 | 技能 | 描述 |
-| :--- | :--- | :--- | :--- |
-| `biorxiv-database` | 预印本搜索 | `citation-management` | 引文管理 |
-| `latex-posters` | LaTeX 海报制作 | `literature-review` | 系统性文献综述 |
-| `openalex-database` | 学术文献分析 | `paper-2-web` | 论文转交互式网页 |
-| `peer-review` | 手稿/资助评审辅助 | `pptx-posters` | HTML/CSS 海报制作 |
-| `pubmed-database` | 数据库访问 | `research-grants` | 资助申请撰写 |
-| `scientific-writing` | 科学写作核心技能 | `scientific-visualization` | 出版级图表制作 |
-
-*(注：为节省篇幅，部分通用或极冷门技能未完全列出，但核心技能已涵盖)*
-
----
-
-## 三、文本处理与写作 (Text & Writing)
+## 二、文本处理与写作 (Text & Writing)
 
 ### 📦 [op7418/Humanizer-zh](https://github.com/op7418/Humanizer-zh)
 | 技能 | 功能 |
@@ -153,27 +81,79 @@
 | | `web-artifacts-builder` | 复杂 Web 产物构建 |
 | | `webapp-testing` | Web 应用测试 |
 
+### 📦 [JimLiu/baoyu-skills](https://github.com/JimLiu/baoyu-skills)
+**简介**：Baoyu 分享的 Claude Code 技能集合，专注于内容生成、发布与 AI 图像处理。
+
+#### 🎨 内容生成技能 (6个)
+| 技能 | 命令 | 功能描述 |
+| :--- | :--- | :--- |
+| **小红书信息图** | `/baoyu-xhs-images` | Style × Layout 二维系统 (9风格×6布局) |
+| **专业信息图** | `/baoyu-infographic` | 20种布局 × 17种视觉风格 |
+| **文章封面** | `/baoyu-cover-image` | 5维系统 (Type×Palette×Rendering×Text×Mood) |
+| **幻灯片** | `/baoyu-slide-deck` | 16种预设风格，自动生成 PPTX/PDF |
+| **知识漫画** | `/baoyu-comic` | 5种艺术风格 × 7种基调 |
+| **文章插图** | `/baoyu-article-illustrator` | 6种类型 × 8种风格 |
+
+#### 📢 内容发布技能 (2个)
+| 技能 | 命令 | 功能描述 |
+| :--- | :--- | :--- |
+| **发布到X** | `/baoyu-post-to-x` | 推文和 X Articles (长文章) |
+| **发布到微信** | `/baoyu-post-to-wechat` | 图文/文章两种模式 |
+
+#### 🤖 AI生成技能 (2个)
+| 技能 | 命令 | 功能描述 |
+| :--- | :--- | :--- |
+| **图像生成** | `/baoyu-image-gen` | OpenAI/Google API 图像生成 |
+| **Gemini Web** | `/baoyu-danger-gemini-web` | 文本和图像生成 ( unofficial API) |
+
+#### 🛠️ 实用工具 (3个)
+| 技能 | 命令 | 功能描述 |
+| :--- | :--- | :--- |
+| **URL转Markdown** | `/baoyu-url-to-markdown` | Chrome CDP 网页捕获 |
+| **X转Markdown** | `/baoyu-danger-x-to-markdown` | 推文/文章转 MD |
+| **图像压缩** | `/baoyu-compress-image` | 保持质量压缩 |
+
 ---
 
-## 四、创业与商业 (Startup & Business)
+## 三、创业与商业 (Startup & Business)
 
-### 📦 [Agent-3-7/yc-advisor](https://github.com/Agent-3-7/agent37-skills-collection)
+### 📦 [Agent-3-7/agent37-skills-collection](https://github.com/Agent-3-7/agent37-skills-collection)
 | 技能 | 功能 |
 | :--- | :--- |
 | `yc-advisor` | **YC 创业顾问**：基于 443 个精选资源（Paul Graham论文/访谈）提供创业决策支持 |
 
 ### 📦 [coreyhaines31/marketingskills](https://github.com/coreyhaines31/marketingskills)
-| 分类 | 技能示例 | 核心功能 |
-| :--- | :--- | :--- |
-| **📈 转化率优化 (CRO)** | `signup-flow-cro` | 注册/页面/表单/弹窗/付费墙优化 |
-| **✍️ 内容营销** | `copywriting` | 文案写作、编辑、内容策略、社交内容 |
-| **🚀 增长策略** | `launch-strategy` | 邮件序列、推荐计划、发布策略、定价 |
-| **🔍 SEO/广告** | `seo-audit` | SEO审计、程序化SEO、Schema标记、付费广告 |
-| **📊 分析优化** | `ab-test-setup` | A/B测试设置、分析追踪、营销心理学 |
+| 技能 | 功能 |
+| :--- | :--- |
+| `ab-test-setup` | **A/B测试设置**：配置和执行A/B测试实验 |
+| `analytics-tracking` | **分析追踪**：设置和分析营销数据追踪 |
+| `competitor-alternatives` | **竞品分析**：识别竞品并提供替代方案分析 |
+| `content-strategy` | **内容策略**：制定和优化内容营销策略 |
+| `copy-editing` | **文案编辑**：优化和编辑营销文案 |
+| `copywriting` | **文案写作**：创作有效的营销文案 |
+| `email-sequence` | **邮件序列**：设计和执行邮件营销序列 |
+| `form-cro` | **表单优化**：优化表单转化率 |
+| `free-tool-strategy` | **免费工具策略**：制定免费工具营销策略 |
+| `launch-strategy` | **发布策略**：产品发布和营销活动策划 |
+| `marketing-ideas` | **营销创意**：生成营销活动和推广创意 |
+| `marketing-psychology` | **营销心理学**：应用心理学原理提升营销效果 |
+| `onboarding-cro` | **引导优化**：优化新用户引导流程转化率 |
+| `page-cro` | **页面优化**：优化单页转化率 |
+| `paid-ads` | **付费广告**：管理和优化付费广告活动 |
+| `paywall-upgrade-cro` | **付费墙优化**：优化付费墙升级转化率 |
+| `popup-cro` | **弹窗优化**：优化弹窗转化率 |
+| `pricing-strategy` | **定价策略**：制定和优化产品定价策略 |
+| `product-marketing-context` | **产品营销**：提供产品营销背景和策略 |
+| `programmatic-seo` | **程序化SEO**：规模化SEO内容生成 |
+| `referral-program` | **推荐计划**：设计和优化推荐奖励计划 |
+| `schema-markup` | **Schema标记**：实现结构化数据标记 |
+| `seo-audit` | **SEO审计**：执行全面的SEO审计 |
+| `signup-flow-cro` | **注册流程优化**：优化注册转化率 |
+| `social-content` | **社交内容**：创建社交媒体内容 |
 
 ---
 
-## 五、笔记与知识管理 (Note-taking & Knowledge)
+## 四、笔记与知识管理 (Note-taking & Knowledge)
 
 ### 📦 [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills)
 | 技能 | 功能 |
@@ -191,7 +171,7 @@
 
 ---
 
-## 六、Prompt工程与技能管理 (Skill Management)
+## 五、Prompt工程与技能管理 (Skill Management)
 
 ### 📦 [chujianyun/skills](https://github.com/chujianyun/skills)
 *   `prompt-optimizer`: Prompt 优化专家（内置 57 种框架）
@@ -205,17 +185,7 @@
 
 ---
 
-## 七、专业领域 (Professional Domains)
-
-### 📦 [alirezarezvani/claude-skills](https://github.com/alirezarezvani/claude-skills)
-**企业级团队技能矩阵**：
-| 团队 | 技能数 | 覆盖范围 |
-| :--- | :---: | :--- |
-| 🛠️ **Engineering** | 18 | 架构, 前后端, QA, DevOps, 安全, 数据工程 |
-| ⚖️ **RA/QM** | 12 | ISO 13485, MDR, FDA, GDPR, ISO 27001 合规 |
-| 📱 **Product** | 6 | 产品策略, 敏捷管理, UX 研究, UI 设计系统 |
-| 👔 **C-Level** | 2 | CEO/CTO 顾问 |
-| 📢 **Marketing** | 5 | 内容创作, 需求生成, ASO, 社媒分析 |
+## 六、专业领域 (Professional Domains)
 
 ### 📦 [muratcankoylan/Agent-Skills-for-Context-Engineering](https://github.com/muratcankoylan/Agent-Skills-for-Context-Engineering)
 **上下文工程与 Agent 设计**：
@@ -224,9 +194,68 @@
 *   **评估调试**：Agent 评估、推理追踪优化 (Reasoning Trace)
 *   **认知建模**：BDI 精神状态建模、记忆系统实现
 
+### 📦 [trailofbits/skills](https://github.com/trailofbits/skills)
+**Trail of Bits 安全研究技能集**：安全研究、漏洞检测、审计工作流工具
+
+#### 🔐 智能合约安全
+| 技能 | 功能 |
+| :--- | :--- |
+| `building-secure-contracts` | 智能合约安全工具包，支持 6 条区块链的漏洞扫描器 |
+| `entry-point-analyzer` | 识别智能合约中状态变更的入口点，用于安全审计 |
+
+#### 🛡️ 代码审计
+| 技能 | 功能 |
+| :--- | :--- |
+| `audit-context-building` | 通过超细粒度代码分析构建深度架构上下文 |
+| `burpsuite-project-parser` | 从 Burp Suite 项目文件中搜索和提取数据 |
+| `differential-review` | 基于历史分析的安全差异化代码审查 |
+| `semgrep-rule-creator` | 创建和优化 Semgrep 规则用于自定义漏洞检测 |
+| `semgrep-rule-variant-creator` | 将现有 Semgrep 规则移植到新目标语言 |
+| `sharp-edges` | 识别易错 API、危险配置和隐患设计 |
+| `static-analysis` | 静态分析工具包 (CodeQL, Semgrep, SARIF 解析) |
+| `testing-handbook-skills` | 测试手册技能：Fuzzers、静态分析、Sanitizers、覆盖率 |
+| `variant-analysis` | 基于模式分析在代码库中发现类似漏洞 |
+
+#### ✅ 验证
+| 技能 | 功能 |
+| :--- | :--- |
+| `constant-time-analysis` | 检测加密代码中编译器引入的时序侧信道 |
+| `property-based-testing` | 多语言和智能合约的基于属性测试指导 |
+| `spec-to-code-compliance` | 区块链审计的规范到代码合规性检查器 |
+
+#### 📋 审计生命周期
+| 技能 | 功能 |
+| :--- | :--- |
+| `fix-review` | 验证修复提交是否解决了审计发现且未引入新漏洞 |
+
+#### 🔧 逆向工程
+| 技能 | 功能 |
+| :--- | :--- |
+| `dwarf-expert` | 交互和理解 DWARF 调试格式 |
+
+#### 📱 移动安全
+| 技能 | 功能 |
+| :--- | :--- |
+| `firebase-apk-scanner` | 扫描 Android APK 的 Firebase 安全配置错误 |
+
+#### 💻 开发
+| 技能 | 功能 |
+| :--- | :--- |
+| `ask-questions-if-underspecified` | 实现前澄清需求 |
+
+#### 👥 团队管理
+| 技能 | 功能 |
+| :--- | :--- |
+| `culture-index` | 解释个人和团队的 Culture Index 调查结果 |
+
+#### 🛠️ 工具
+| 技能 | 功能 |
+| :--- | :--- |
+| `claude-in-chrome-troubleshooting` | 诊断和修复 Claude in Chrome MCP 扩展连接问题 |
+
 ---
 
-## 八、综合工具集 (Comprehensive Toolkits)
+## 七、综合工具集 (Comprehensive Toolkits)
 
 ### 📦 [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills)
 
@@ -248,27 +277,4 @@
 
 ---
 
-## 九、开发工具集 (Development Toolkit)
-
-### 📦 [mrgoonie/claudekit-skills](https://github.com/mrgoonie/claudekit-skills)
-
-ClaudeKit.cc 官方提供的开发全生命周期工具集：
-
-| 模块 | 插件名称 | 核心能力 |
-| :--- | :--- | :--- |
-| **💻 开发工具** | `web-dev-tools` | React, Next.js, Tailwind CSS 支持 |
-| | `backend-tools` | Node.js, Python, Go, 认证模块 |
-| | `devops-tools` | Cloudflare, Docker, GCP, 数据库管理 |
-| | `debugging-tools` | 系统化调试框架 |
-| **🤖 AI 与处理** | `ai-ml-tools` | Gemini API 集成, 上下文工程 |
-| | `document-tools` | Word, PDF, PPT, Excel 处理 |
-| | `media-tools` | FFmpeg, ImageMagick 媒体处理 |
-| | `research-tools` | 文档发现与检索 |
-| **🚀 高级功能** | `problem-solving` | 高级思维技术框架 |
-| | `specialized-tools` | 顺序思考, 图表生成 |
-| | `platform-tools` | Shopify 集成, MCP 管理 |
-| | `meta-tools` | 技能创建, 代码审查 |
-
----
-
-> 📝 **备注**：本文档更新于 2026-01-28。
+> 📝 **备注**：本文档更新于 2026-02-03，已同步 GitHub 仓库最新技能列表。

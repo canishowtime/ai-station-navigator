@@ -11,6 +11,22 @@ tinydb~=4.8.0    # 允许 4.8.x 补丁更新，拒绝 5.x breaking changes
 # YAML 配置解析
 pyyaml>=6.0
 
+# Security Scanner for Agent Skills (Apache 2.0)
+cisco-ai-skill-scanner>=0.1.0
+# 注意：该包的 LLM 依赖（google-generativeai, litellm, openai）对本项目非必需
+# 安装后可运行：pip uninstall -y google-generativeai google-genai litellm openai google-api-python-client google-auth
+# 节省约 180 MB 空间，不影响扫描功能
+
+# YARA 恶意软件模式匹配 (security_scanner.py 依赖)
+yara-python>=4.5.0
+
+# Markdown Frontmatter 解析 (security_scanner.py 依赖)
+python-frontmatter>=1.0.0
+
+# LangGraph 工作流引擎 (skill_install_workflow.py)
+langgraph>=0.2.0
+typing-extensions>=4.9.0
+
 # =============================================================================
 # 可选依赖
 # =============================================================================

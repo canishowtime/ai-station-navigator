@@ -42,6 +42,12 @@
 * **说明**: 微软现代化终端模拟器
 * **条款**: https://github.com/microsoft/terminal/blob/main/LICENSE
 
+### 5. Cisco Skill Scanner
+* **项目: https://github.com/cisco-ai-defense/skill-scanner
+* **协议: Apache-2.0
+* **说明: 由思科（Cisco）开发的 AI 技能安全扫描工具，用于检测 AI 插件及 Agent 定义中的潜在安全风险。
+* **条款: https://github.com/cisco-ai-defense/skill-scanner/blob/main/LICENSE
+
 ---
 
 ## 免责声明 (Disclaimer)
@@ -62,7 +68,10 @@
 
 ---
 
-## 🐍 Python 第三方库
+## 🐛 Python 第三方库
+
+> **完整法律声明**: 本项目使用的所有 Python 第三方库（100+）详见 `bin/python/Lib/site-packages/LICENSES.txt`
+> 该文件包含完整的许可证信息、版权声明及版本号。下表为主要依赖库概览。
 
 ### 核心依赖
 | 库名称 | 协议 | 说明 |
@@ -103,6 +112,155 @@
 |:---|:---|:---|
 | [six](https://github.com/benjaminp/six) | MIT | Python 2/3 兼容层 |
 | [typing_extensions](https://github.com/python/typing_extensions) | Python-2.0 | typing 模块反向移植 |
+| [click](https://github.com/pallets/click) | MIT | 命令行界面创建工具 |
+| [rich](https://github.com/Textualize/rich) | MIT | 终端富文本格式化 |
+| [tabulate](https://github.com/astanin/python-tabulate) | MIT | 表格格式化输出 |
+| [colorama](https://github.com/tartley/colorama) | BSD | 跨平台终端颜色输出 |
+| [tqdm](https://github.com/tqdm/tqdm) | MPL-2.0 / MIT | 进度条显示库 |
+
+### AI/ML 框架
+| 库名称 | 协议 | 说明 |
+|:---|:---|:---|
+| [anthropic](https://github.com/anthropics/anthropic-python) | MIT | Anthropic API 官方 SDK |
+| [tiktoken](https://github.com/openai/tiktoken) | MIT | OpenAI 分词器 |
+| [huggingface_hub](https://github.com/huggingface/huggingface_hub) | Apache-2.0 | Hugging Face 模型仓库 |
+| [tokenizers](https://github.com/huggingface/tokenizers) | Apache-2.0 | 高性能分词器 |
+
+### 异步与并发
+| 库名称 | 协议 | 说明 |
+|:---|:---|:---|
+| [aiohttp](https://github.com/aio-libs/aiohttp) | Apache-2.0 / MIT | 异步 HTTP 客户端/服务器 |
+| [httpx](https://github.com/encode/httpx) | BSD-3-Clause | 现代异步 HTTP 客户端 |
+| [httpcore](https://github.com/encode/httpcore) | BSD | HTTP/1.1 / HTTP/2 核心库 |
+| [anyio](https://github.com/agronholm/anyio) | MIT | 异步网络 I/O 抽象层 |
+| [websockets](https://github.com/aaugustin/websockets) | BSD-3-Clause | WebSocket 协议实现 |
+| [watchfiles](https://github.com/samuelcolvin/watchfiles) | MIT | 文件监控库 |
+
+### Web 框架
+| 库名称 | 协议 | 说明 |
+|:---|:---|:---|
+| [fastapi](https://github.com/tiangolo/fastapi) | MIT | 现代异步 Web 框架 |
+| [starlette](https://github.com/encode/starlette) | BSD | ASGI 工具包 |
+| [uvicorn](https://github.com/encode/uvicorn) | BSD | ASGI HTTP 服务器 |
+
+### 数据验证与序列化
+| 库名称 | 协议 | 说明 |
+|:---|:---|:---|
+| [pydantic](https://github.com/pydantic/pydantic) | MIT | 数据验证与设置管理 |
+| [pydantic-core](https://github.com/pydantic/pydantic-core) | MIT | Pydantic 核心引擎 |
+| [attrs](https://github.com/python-attrs/attrs) | MIT | 类装饰器与工具 |
+| [orjson](https://github.com/ijl/orjson) | Apache-2.0 / MIT | 高性能 JSON 序列化 |
+| [ormsgpack](https://github.com/ormsgpack/ormsgpack) | Apache-2.0 / MIT | 高性能 MessagePack |
+
+### LangChain 生态
+| 库名称 | 协议 | 说明 |
+|:---|:---|:---|
+| [langchain-core](https://github.com/langchain-ai/langchain) | MIT | LangChain 核心接口 |
+| [langgraph](https://github.com/langchain-ai/langgraph) | MIT | 状态ful Agent 框架 |
+| [langgraph-checkpoint](https://github.com/langchain-ai/langgraph) | MIT | LangGraph 检查点机制 |
+| [langgraph-checkpoint-sqlite](https://github.com/langchain-ai/langgraph) | MIT | SQLite 检查点存储 |
+| [langgraph-prebuilt](https://github.com/langchain-ai/langgraph) | MIT | LangGraph 预构建组件 |
+| [langgraph-sdk](https://github.com/langchain-ai/langgraph) | MIT | LangGraph SDK |
+| [langsmith](https://github.com/langchain-ai/langsmith) | MIT | LangChain 调试与监控平台 |
+
+### 数据库与存储
+| 库名称 | 协议 | 说明 |
+|:---|:---|:---|
+| [TinyDB](https://github.com/msiemens/tinydb) | MIT | 轻量级文档数据库 |
+| [aiosqlite](https://github.com/jreese/aiosqlite) | MIT | 异步 SQLite 封装 |
+| [sqlite-vec](https://github.com/asg017/sqlite-vec) | MIT / Apache-2.0 | SQLite 向量搜索扩展 |
+
+### 网络工具
+| 库名称 | 协议 | 说明 |
+|:---|:---|:---|
+| [urllib3](https://github.com/urllib3/urllib3) | Apache-2.0 | HTTP 客户端库 |
+| [httplib2](https://github.com/httplib2/httplib2) | MIT | 综合 HTTP 客户端 |
+| [requests-toolbelt](https://github.com/requests/toolbelt) | Apache-2.0 | Requests 实用工具集 |
+| [sniffio](https://github.com/python-trio/sniffio) | MIT / Apache-2.0 | 异步库检测 |
+| [h11](https://github.com/python-hyper/h11) | MIT | HTTP/1.1 协议实现 |
+
+### 安全与加密
+| 库名称 | 协议 | 说明 |
+|:---|:---|:---|
+| [cryptography](https://github.com/pyca/cryptography) | Apache-2.0 / BSD | 加密工具库 |
+| [certifi](https://github.com/certifi/python-certifi) | MPL-2.0 | Mozilla CA 证书包 |
+| [yara-python](https://github.com/VirusTotal/yara-python) | BSD-3-Clause | 恶意软件模式匹配 |
+
+### 文件处理
+| 库名称 | 协议 | 说明 |
+|:---|:---|:---|
+| [openpyxl](https://github.com/theorchard/openpyxl) | MIT | Excel 文件读写 |
+| [python-dateutil](https://github.com/dateutil/dateutil) | Apache-2.0 / BSD | 日期时间解析 |
+| [python-dotenv](https://github.com/theskumar/python-dotenv) | BSD | .env 文件解析 |
+| [fsspec](https://github.com/fsspec/filesystem_spec) | BSD | 文件系统抽象层 |
+
+### Markdown 处理
+| 库名称 | 协议 | 说明 |
+|:---|:---|:---|
+| [markdown-it-py](https://github.com/executablebooks/markdown-it-py) | MIT | Markdown 解析器 |
+| [mdurl](https://github.com/executablebooks/mdurl) | MIT | URL 解析工具 |
+| [python-frontmatter](https://github.com/eyeseast/python-frontmatter) | MIT | Frontmatter 元数据解析 |
+
+### 其他工具库
+| 库名称 | 协议 | 说明 |
+|:---|:---|:---|
+| [docstring_parser](https://github.com/rr-/docstring_parser) | MIT | 文档字符串解析 |
+| [python-frontmatter](https://github.com/eyeseast/python-frontmatter) | MIT | Frontmatter 元数据处理 |
+| [referencing](https://github.com/compositionalhq/referencing) | MIT | JSON Schema 引用解析 |
+| [jsonschema](https://github.com/python-jsonschema/jsonschema) | MIT | JSON Schema 验证 |
+| [jsonschema-specifications](https://github.com/python-jsonschema/jsonschema-specifications) | MIT | JSON Schema 规范 |
+| [rpds-py](https://github.com/crate-py/rpds) | MIT / Apache-2.0 | 高性能持久化数据结构 |
+| [regex](https://github.com/mrabarnett/mrab-regex) | Apache-2.0 | 正则表达式引擎 |
+| [pyparsing](https://github.com/pyparsing/pyparsing) | MIT | Python 解析器构建 |
+| [typer-slim](https://github.com/fastapi/typer) | MIT | 命令行界面构建 |
+| [typing-inspection](https://github.com/ilevkivskyi/typing_inspection) | MIT | 运行时类型检查 |
+
+### 工具与实用程序
+| 库名称 | 协议 | 说明 |
+|:---|:---|:---|
+| [aiohappyeyeballs](https://github.com/sethmlarson/aiohappyeyeballs) | PSF-2.0 | 异步连接管理 |
+| [aiosignal](https://github.com/aio-libs/aiosignal) | Apache-2.0 | 异步信号量 |
+| [annotated-doc](https://github.com/alteryks/annotated-doc) | MIT | 注解文档生成 |
+| [annotated-types](https://github.com/cython-pr/annotated-types) | MIT | 类型注解支持 |
+| [async-timeout](https://github.com/aio-libs/async-timeout) | Apache-2.0 | 异步超时管理 |
+| [bson](https://github.com/py-bson/bson) | BSD | BSON 编码/解码 |
+| [cffi](https://github.com/python-cffi/cffi) | MIT | C 外部函数接口 |
+| [distro](https://github.com/nir0s/distro) | Apache-2.0 | Linux 发行版信息 |
+| [et_xmlfile](https://github.com/heince/et_xmlfile) | MIT | XML 文件处理 |
+| [fastuuid](https://github.com/omenband/fastuuid) | MIT | 高性能 UUID |
+| [filelock](https://github.com/tox-dev/pyfilelock) | BSD | 跨平台文件锁 |
+| [frozenlist](https://github.com/aio-libs/frozenlist) | Apache-2.0 | 不可变列表 |
+| [fsspec](https://github.com/fsspec/filesystem_spec) | BSD | 文件系统规范 |
+| [googleapis-common-protos](https://github.com/googleapis/python-api-common-protos) | Apache-2.0 | Google API 通用原型 |
+| [grpcio](https://github.com/grpc/grpc) | Apache-2.0 | gRPC 框架 |
+| [grpcio-status](https://github.com/grpc/grpc) | Apache-2.0 | gRPC 状态码 |
+| [hf-xet](https://huggingface.co) | Apache-2.0 | Hugging Face 下载加速 |
+| [httptools](https://github.com/MagicStack/httptools) | MIT | HTTP 解析工具 |
+| [importlib_metadata](https://github.com/python/cpython) | Apache-2.0 | 元数据读取 |
+| [jiter](https://github.com/urantkristian/jiter) | MIT | JSON 迭代器 |
+| [jsonpatch](https://github.com/stefankoegl/python-jsonpatch) | BSD | JSON Patch 实现 |
+| [jsonpointer](https://github.com/stefankoegl/python-jsonpointer) | BSD | JSON Pointer 实现 |
+| [multidict](https://github.com/aio-libs/multidict) | Apache-2.0 | 多键字典 |
+| [propcache](https://github.com/aio-libs/propcache) | Apache-2.0 | 属性缓存 |
+| [proto-plus](https://github.com/ebookapps/python-proto-plus) | Apache-2.0 | Protocol Buffers 增强 |
+| [pyasn1](https://github.com/pyasn1/pyasn1) | BSD-2-Clause | ASN.1 数据结构 |
+| [pyasn1_modules](https://github.com/pyasn1/pyasn1-modules) | BSD | ASN.1 模块 |
+| [pycparser](https://github.com/eliben/pycparser) | BSD | C 语言解析器 |
+| [python-multipart](https://github.com/Kludex/python-multipart) | Apache-2.0 | Multipart 表单数据 |
+| [referencing](https://github.com/compositionalhq/referencing) | MIT | JSON Schema 引用 |
+| [rsa](https://github.com/sybrenstuvel/python-rsa) | Apache-2.0 | RSA 加密 |
+| [shellingham](https://github.com/sarugaku/shellingham) | ISC | Shell 检测 |
+| [soupsieve](https://github.com/facelessuser/soupsieve) | MIT | CSS 选择器过滤器 |
+| [tenacity](https://github.com/jd/tenacity) | Apache-2.0 | 重试逻辑库 |
+| [typer-slim](https://github.com/fastapi/typer) | MIT | CLI 构建工具 |
+| [typing-inspection](https://github.com/ilevkivskyi/typing_inspection) | MIT | 类型内省 |
+| [uritemplate](https://github.com/python-hyper/uritemplate) | BSD / Apache-2.0 | URI 模板 |
+| [uuid_utils](https://github.com/aminalaee/uuid-utils) | BSD-3-Clause | UUID 工具 |
+| [wheel](https://github.com/pypa/wheel) | MIT | Wheel 包格式 |
+| [xxhash](https://github.com/ifduyue/python-xxhash) | BSD | xxHash 哈希 |
+| [yarl](https://github.com/aio-libs/yarl) | Apache-2.0 | URL 处理 |
+| [zipp](https://github.com/jaraco/zipp) | MIT | Zipfile 路径兼容 |
+| [zstandard](https://github.com/indygreg/python-zstandard) | BSD-3-Clause | Zstandard 压缩 |
 
 ---
 
@@ -158,4 +316,4 @@
 
 ---
 
-*最后更新: 2026-01-28*
+*最后更新: 2026-02-05*

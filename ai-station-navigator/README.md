@@ -30,9 +30,7 @@ AI Station Navigator 是一个**生产就绪**的模块化 Claude 智能体框�
 
 | 工具 | 功能 | 命令 |
 |:---|:---|---|
-| **skill_manager** | 技能安装/卸载/转换/验证 | `python bin/skill_manager.py <cmd>` |
-| **skill_matcher** | 智能技能匹配引擎 | `python bin/skill_matcher.py <cmd>` |
-| **skill_creator** | 技能创建/验证/打包 | `python bin/skill_creator.py <cmd>` |
+| **skill_manager** | 技能安装/卸载/搜索/转换/验证 | `python bin/skill_manager.py <cmd>` |
 | **mcp_manager** | MCP 服务器管理 | `python bin/mcp_manager.py <cmd>` |
 | **improvement_manager** | 系统改进方案管理 (双轨制) | `python bin/improvement_manager.py <cmd>` |
 | **improvement_checklist** | 改进完成度检查清单 | `python bin/improvement_checklist.py <cmd>` |
@@ -58,8 +56,6 @@ AI Station Navigator 是一个**生产就绪**的模块化 Claude 智能体框�
 project-root/
 ├── bin/                     🔒 核心脚本 (只读)
 │   ├── skill_manager.py         技能管理器
-│   ├── skill_matcher.py         智能匹配引擎
-│   ├── skill_creator.py         技能创建器
 │   ├── mcp_manager.py           MCP 管理器
 │   ├── improvement_manager.py   改进管理器
 │   ├── improvement_checklist.py 检查清单
@@ -69,8 +65,7 @@ project-root/
 ├── .claude/                 🟡 系统配置/状态/智能体定义
 │   ├── agents/                  子智能体定义
 │   │   ├── worker_agent.md          内部脚本执行器
-│   │   ├── skills_agent.md          技能运行时
-│   │   └── mcp_agent.md             MCP 操作员
+│   │   └── skills_agent.md          技能运行时
 │   ├── skills/              🧪 已安装技能
 │   │   └── skills.db               TinyDB 统一数据源
 │   ├── memory/              💾 用户偏好与状态
@@ -131,7 +126,7 @@ python bin/skill_manager.py list
 python bin/skill_manager.py install <source>
 
 # 搜索技能 (智能匹配)
-python bin/skill_matcher.py match <keyword>
+python bin/skill_manager.py search <keyword>
 ```
 
 ### 4. MCP 服务器管理
@@ -212,7 +207,7 @@ python bin/improvement_checklist.py check <id>
 ```
 用户输入任务
     ↓
-[skill_matcher.match()] → 智能匹配相关技能
+[skill_manager search] → 智能匹配相关技能
     ↓
 分支决策:
 ├─ 已安装 → [skills 子智能体] → 直接执行
@@ -279,7 +274,7 @@ python bin/improvement_checklist.py check <id>
 
 ### 匹配算法
 
-skill_matcher 使用多维度加权评分：
+skill_manager 使用多维度加权评分：
 
 | 维度 | 权重 | 说明 |
 |:---|:---|:---|
@@ -293,14 +288,11 @@ skill_matcher 使用多维度加权评分：
 ### 使用示例
 
 ```bash
-# 匹配相关技能 (已安装 + 推荐)
-python bin/skill_matcher.py match "图像处理"
+# 搜索技能 (已安装 + 推荐)
+python bin/skill_manager.py search "图像处理"
 
-# 定位技能 (优先已安装)
-python bin/skill_matcher.py locate "pdf"
-
-# 同步数据库
-python bin/skill_matcher.py sync
+# 列出已安装技能
+python bin/skill_manager.py list
 ```
 
 ---
@@ -382,7 +374,6 @@ skill-name/
 ### 同步机制
 
 - 安装/卸载时自动同步 skills.db
-- `skill_matcher sync` 手动同步
 - 用户偏好自动记录到 user_choices.json
 
 ---

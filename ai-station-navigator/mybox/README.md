@@ -1,26 +1,20 @@
-# mybox/ - 领航员操作系统的沙箱工作区
+# mybox/ - 领航员沙箱工作区
 
-**定位**：安全隔离区 + 临时数据中转站 + Sub-agent 试验场
+**定位**: 安全隔离区 + 临时数据中转站
+
+**详细规范**: 见 `docs/filesystem.md`
 
 ---
 
-## 目录结构
+## 标准目录结构
 
 ```
 mybox/
-├── workspace/           # 🟢 用户任务区
-│   ├── current/         # 当前正在进行的任务产生的文件
-│   └── outputs/         # 最终生成的成品（图表、文档），等待用户取走
-│
-├── downloads/           # 🟠 下载缓存区
-│   └── (AI 从互联网下载的原始素材，定期清理)
-│
-├── debug/               # 🔴 维修区 (Doctor Agent 专用)
-│   └── (用于复现 Bug 的隔离环境)
-│
-└── logs/                # 📝 运行日志
-    ├── install.log      # 安装日志
-    └── error_trace.log  # 报错堆栈
+├── workspace/    # 🟢 工作区 (按任务名组织)
+├── temp/         # 🟠 临时文件 (自动清理)
+├── cache/        # 💾 持久化缓存
+│   └── repos/    # Git 仓库缓存
+└── logs/         # 📝 运行日志 (自动轮转)
 ```
 
 ---
@@ -28,21 +22,21 @@ mybox/
 ## 核心规则
 
 ### 1. 安全隔离
-- ✅ **读操作**：可以读取项目任何位置
-- ⚠️ **写操作**：默认只能在 `mybox/` 内执行
-- 🛡️ **系统修改**：必须调用 `pkg_manager.py` 或 `builder_tools.py`
+- ✅ **读操作**: 可以读取项目任何位置
+- ⚠️ **写操作**: 默认只能在 `mybox/` 内执行
+- 🛡️ **系统修改**: 必须调用 `bin/` 脚本
 
-### 2. 临时文件生命周期
+### 2. 数据流向
 ```
-用户任务 → 在 mybox/workspace/current/ 处理
-         → 生成成品到 mybox/workspace/outputs/
-         → 用户取走后清理
+外部文件 → mybox/temp/ (下载)
+         → mybox/workspace/<task>/ (处理)
+         → 任务完成后清理
 ```
 
 ### 3. 禁止操作
-- ❌ 直接在根目录执行 `rm *`
-- ❌ 直接修改 `skills-store/` 或 `skills-runtime/`
-- ❌ 在非 `mybox/` 位置创建临时文件
+- ❌ 在 `mybox/` 根目录直接创建文件
+- ❌ 在非 `mybox/` 位置写入临时文件
+- ❌ 使用未规范的目录
 
 ---
 
@@ -51,29 +45,24 @@ mybox/
 ### 场景 1：文件处理
 ```
 用户: "提取 PDF 里的图片"
-AI: 在 mybox/workspace/current/ 提取
-   → mybox/workspace/outputs/images.zip
-   → 用户下载后清理
+AI: → mybox/workspace/pdf-extract/ 处理
+   → 完成后清理
 ```
 
-### 场景 2：安装测试
+### 场景 2：任务隔离
 ```
-Builder Agent: 先下载到 mybox/downloads/
-            → 检查是否有恶意代码
-            → 通过后才搬运到 skills-store/
-```
-
-### 场景 3：代码修复
-```
-Doctor Agent: 复制问题脚本到 mybox/debug/
-           → 尝试修复并测试
-           → 成功后才覆盖回正式目录
+用户: "爬取+分析+导出"
+AI: → mybox/workspace/crawl-task/
+   → 所有中间产物放此目录
+   → 完成后整体清理
 ```
 
 ---
 
 ## 清理策略
 
-- **自动清理**：每次任务结束后清理 `mybox/workspace/current/`
-- **定期清理**：每周清理 `mybox/downloads/` 和 `mybox/logs/`
-- **手动清理**：`rm -rf mybox/workspace/current/*`
+| 目录 | 清理方式 | 时机 |
+|:---|:---|:---|
+| `workspace/` | 手动 | 任务完成后 |
+| `temp/` | 自动/手动 | 定期 |
+| `logs/` | 自动轮转 | 会话开始 |

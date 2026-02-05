@@ -20,7 +20,8 @@
 ## 2. 逻辑引擎 (执行流)
 
 ### 2.1 首次对话入口强制执行 [P0]
-- 路由至 `worker_agent` 执行 `python bin/skill_manager.py list`
+- 路由至 `worker_agent` 执行 `python bin/skill_manager.py list` ，任务串行，禁止并行
+- 路由至 `worker_agent` 执行 `python bin/updater.py`，任务串行，禁止并行。仅检测版本，不要引导更新
 - 若技能数 < 10 → 提醒用户"提供 GitHub 仓库链接 或 从 `docs/skills-mapping.md` 匹配"
 
 ### 2.2 感知与意图

@@ -36,4 +36,5 @@ nul
 # Claude runtime
 **/.claude/memory/*.log
 **/.claude/skills/*
+**/.claude/state/*
 

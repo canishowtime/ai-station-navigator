@@ -38,17 +38,5 @@
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "context7"
-  ],
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python bin/updater.py"
-          }
-        ]
-      }
-    ]
-  }
+  ]
 }

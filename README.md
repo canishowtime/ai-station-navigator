@@ -1,4 +1,6 @@
-# AI Station Navigator �         [english](#AI Station Navigator) | [中文](#AI 工作站 领航员)�
+[english](#en) | [中文](#cn)
+<span id="en"></span>
+# AI Station Navigator     
 > **Agent System Bus and Scheduler based on Claude Code (Kernel Logic Core)**
 
 <br>
@@ -119,8 +121,8 @@ Here are some GitHub projects collected for testing: [View Skills Categories](sk
 
 ---
 
-
-# AI 工作站 领航员�    �         [english](#AI Station Navigator) | [中文](#AI 工作站 领航员)�
+<span id="cn"></span>
+# AI 工作站 领航员
 > **基于 Claude Code 的智能体系统总线与调度器 (Kernel Logic Core)**
 
 <br>

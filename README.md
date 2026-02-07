@@ -1,4 +1,4 @@
-[english](#en) | [中文](#cn)
+[English](#en)  |  [中文](#cn)
 <span id="en"></span>
 # AI Station Navigator     
 > **Agent System Bus and Scheduler based on Claude Code (Kernel Logic Core)**

@@ -1,4 +1,126 @@
-# AI Station Navigator 🧭
+# AI Station Navigator �         [english](#AI Station Navigator) | [中文](#AI 工作站 领航员)�
+> **Agent System Bus and Scheduler based on Claude Code (Kernel Logic Core)**
+
+<br>
+
+<div align="center">
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)](https://microsoft.com)
+[![Release](https://img.shields.io/github/v/release/YOUR_USERNAME/YOUR_REPO_NAME?label=Release&color=blue)](https://github.com/canishowtime/ai-station-navigator/releases)
+
+[![Python](https://img.shields.io/badge/Python-3.8%2B_(Portable)-3776AB?logo=python&logoColor=white)](https://python.org)
+[![Node.js](https://img.shields.io/badge/Node.js-Bundled-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![Git](https://img.shields.io/badge/Git-Embedded-F05032?logo=git&logoColor=white)](https://git-scm.com)
+
+[![Powered By](https://img.shields.io/badge/Powered%20By-Windows%20Terminal-4D4D4D?logo=windows-terminal&logoColor=white)](https://github.com/microsoft/terminal)
+[![Claude Code](https://img.shields.io/badge/Integration-Claude%20Code-D97757?logo=anthropic&logoColor=white)](https://anthropic.com)
+
+</div>
+
+<br>
+
+**AI Station Navigator** is a modular AI workstation built on the Claude Code engine. Mimicking the principles of computer organization, it routes complex AI tasks to **Sub-Agents** and matches them with corresponding skills for execution. The project integrates an "App Store-style" skill management system and a sandboxed execution environment. Paired with a fully portable, installation-free runtime, it aims to provide users with an unzip-and-play, stable, and infinitely scalable personal AI intelligence hub.
+
+** ✅ Agent Context Optimization | ✅ App Store-style Skill Management | ✅ Excellent UI | ✅ Sandbox Isolation | ✅ Skills Security Scanning | ✅ Modular Architecture**
+
+---
+
+## 🎯 Core Design Philosophy: AI Workstation Architecture
+
+The project references computer organization principles to transform AI capabilities into stable, scalable system services:
+
+### 🏗️ Architecture Analogy
+
+| Physical Component | Software Mapping | Role & Function Description |
+| --- | --- | --- |
+| **CPU** | **LLM** | **Computing Power**: Responsible for driving capabilities. |
+| **System Kernel** | **Claude Code + CLAUDE.md** | **Core Logic Layer**: Responsible for intent recognition, instruction scheduling, task decomposition, and context management. |
+| **System Processes** | **Sub-Agents (worker/skills)** | **Execution Layer**: Sub-agents isolate the running of single applications or scripts, **reducing context pollution for the main agent**. |
+| **Applications (Apps)** | **Skills (GitHub Repos)** | **Function Plugin Layer**: Implements "App Store-style" one-click installation and invocation via GitHub links. |
+| **System Drivers** | **MCP + Hooks** | **Extension & Automation**: MCP provides external system extensions; Hooks drive system automation (logs/space/status). |
+| **Monitor** | **Windows Terminal** | **Information Output**: Provides status display and information output. |
+| **Runtime Environment** | **Portable Environment** | **Underlying Support**: Integrated portable versions of Python, Node.js, and Git. Ensures a highly unified environment and enhances potential scalability. |
+
+---
+
+## ✨ Core Features
+
+* 🧠 **Key Highlights**
+* **Convenient Environment Startup**: Simply double-click the script to start the environment; ready to use after a quick configuration.
+* **One-Click App Installation**: Supports installing skills directly via GitHub repository links, supporting various skill project types.
+* **Session Isolation**: Through task routing, Sub-Agents run scripts or skills independently, protecting the main dialogue Context from being overwhelmed by redundant data.
+* **Immersive Interactive Terminal**: Visual interface based on modern terminals, balancing professionalism with ease of use (default light theme).
+* **Build Basic Workflows**: Achieve serial execution of multiple skills combined into a workflow through task decomposition.
+* **Extension & Automation**: MCP connects to external systems (e.g., AI search engines); Hooks provide automation support.
+* **Environment Sandbox**: The tool runs entirely within a sandbox, ensuring it does not affect global system settings. Dedicated spaces are also configured within the agents.
+* **Skills Security Detection**: Integrates the [Cisco Skill Scanner](https://github.com/cisco-ai-defense/skill-scanner) developed by Cisco AI Defense. It automatically detects potential security risks after installing skills.
+
+---
+
+## 📂 Directory Structure
+
+```text
+ai-station-navigator/
+├── .claude/                    # System Configuration (Registry)
+│   ├── agents/                 # Sub-Agent Definitions (Processes)
+│   ├── skills/                 # Installed Apps (App Center) 
+├── bin/                        # System Core Scripts (Kernel Components)
+│   ├── skill_manager.py        # Skill Manager (App Store Entry)
+│   ├── mcp_manager.py          # MCP Driver Manager
+│   └── hooks_manager.py        # Automation Hooks Manager
+├── docs/                       # System Documentation (Manuals)
+├── mybox/                      # Sandbox Workspace (Personal Space)
+│   ├── workspace/              # Task Processing Center
+│   └── output/                 # Final Output Export
+├── CLAUDE.md                   # Kernel Logic Core (System CPU)
+└── requirements.txt            # Python Dependencies
+
+```
+
+---
+
+## 🚀 Quick Start
+
+### 1. One-Click Launch
+
+Download the **[All-in-One Package](https://github.com/canishowtime/ai-station-navigator/releases)** to achieve zero-configuration operation:
+
+1. **Launch**: Double-click `Start ai-station-navigator.bat` in the root directory.
+2. **Ready**: Follow the on-screen prompts to install missing components and input your self-prepared `LLM-API-KEY` to enter the startup state.
+
+### 2. Intelligent Management (Chat as Command)
+
+Enter the following instructions directly into the chat box to manage and run skills via **Sub-Agents** (Sub-processes), effectively reducing context pollution for the main agent:
+(The system has a built-in GitHub network accelerator to solve network issues with Git source retrieval. You can paste the original address or path directly. It can be a main project or a specific sub-skill).
+
+* **Check Capabilities**: `What skills do you have now?`
+* **Install App**: `Install skill: https://github.com/xxx/repo` (Automatically performs installation. If the main project is a skill package, it is recommended to point the address path correctly to the specific skill you need; otherwise, the entire skill package will be installed).
+* **Use App**: `@Skill [Requirement Content]` (Automatically analyzes the requirement, matches installed skills, and executes immediately upon confirmation, returning the result).
+* **Uninstall App**: `Uninstall skill: https://github.com/xxx/repo` or `xxx/repo`.
+* **Try Creating a Skills Workflow**: `Refer to docs\skills-mapping.md to design a workflow containing X steps, based on the flow xx,xx,xx,xx..., to be used in the xxxx scenario.`
+
+Here are some GitHub projects collected for testing: [View Skills Categories](skills-by-category.md)
+
+---
+
+## ⚖️ Disclaimer
+
+1. **At Your Own Risk**: AI-generated code or executed commands possess randomness. Please be sure to audit before authorizing the AI to delete or modify files.
+2. **Liability**: The author assumes no responsibility for any data loss or system damage caused by the use of this tool.
+
+---
+
+## 🤝 Contribution & Support
+
+* **Author**: Mazilin
+* **Project Homepage**: [canishowtime/ai-station-navigator](https://github.com/canishowtime/ai-station-navigator)
+* **Feedback Channels**: [GitHub Issues](https://github.com/canishowtime/ai-station-navigator/issues) | [Discussions](https://github.com/canishowtime/ai-station-navigator/discussions)
+
+---
+
+
+# AI 工作站 领航员�    �         [english](#AI Station Navigator) | [中文](#AI 工作站 领航员)�
 > **基于 Claude Code 的智能体系统总线与调度器 (Kernel Logic Core)**
 
 <br>
@@ -22,7 +144,7 @@
 
 **AI Station Navigator** 是一款基于 Claude Code 引擎构建的模块化 AI 工作站。它模仿计算机组成原理，将繁杂的 AI 任务路由至子智能体（Sub-Agents）内并匹配相应的skills执行。项目集成了“应用商店式”技能管理与沙盒化执行环境，配合全绿色的免安装运行环境，旨在为用户提供一个解压即用、性能稳定、无限扩展的个人 AI 智慧中枢。
 
-** ✅ 智能体上下文优化 | ✅ 应用商店式技能管理 | ✅ 良好的UI | ✅ 沙盒隔离 | ✅ 绿色零预装 | ✅ 模块化架构**
+** ✅ 智能体上下文优化 | ✅ 应用商店式技能管理 | ✅ 良好的UI | ✅ 沙盒隔离 | ✅ Skills安全扫描 | ✅ 模块化架构**
 
 ---
 

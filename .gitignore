@@ -36,6 +36,7 @@ nul
 # Claude runtime
 **/.claude/memory/*.log
 **/.claude/state/*
+**/.claude/skills/*
 
 # Generated update script
 **/bin/update_skills_mapping.py

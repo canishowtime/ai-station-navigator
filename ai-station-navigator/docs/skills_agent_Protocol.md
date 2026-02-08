@@ -49,7 +49,7 @@ Task(
 | `success` | ✅ | 完全成功 | 技能执行完成 |
 | `pending` | ⏸️ | 等待参数 | 需要用户提供更多信息 |
 | `error` | ❌ | 执行失败 | 可恢复或不可恢复的错误 |
-| `timeout` | ⏱️ | 超时 | 执行超过60秒 |
+| `timeout` | ⏱️ | 超时 | 执行超过90秒 |
 
 ### 2.3 内容透传规则 [P0]
 Skills Agent 返回包含以下字段时，Kernel **必须**主动输出：
@@ -82,10 +82,10 @@ Skills Agent 返回包含以下字段时，Kernel **必须**主动输出：
   meta: {agent: skills, time: 0.2, ts: "2025-01-29T10:30:00Z"}
 
 # 超时
-⏱️ skills Timeout: 执行超时 (>60秒)
+⏱️ skills Timeout: 执行超时 (>90秒)
   state: timeout
-  data: {skill: "large-processor", elapsed: 60, limit: 60}
-  meta: {agent: skills, time: 60, ts: "2025-01-29T10:30:00Z"}
+  data: {skill: "large-processor", elapsed: 90, limit: 90}
+  meta: {agent: skills, time: 90, ts: "2025-01-29T10:30:00Z"}
 ```
 
 ---
@@ -98,7 +98,7 @@ Skills Agent 返回包含以下字段时，Kernel **必须**主动输出：
 | `MetadataMissing` | SKILL.md 损坏或缺失 | false | 重新安装技能 |
 | `ParamMissing` | 参数不足: 需要 `<param>` | true | 询问用户提供 |
 | `RuntimeFailed` | 执行失败: `<stderr片段>` | null | 视具体错误判断 |
-| `Timeout` | 执行超时 (>60秒) | true | 建议拆分任务 |
+| `Timeout` | 执行超时 (>90秒) | true | 建议拆分任务 |
 
 ---
 
@@ -131,4 +131,4 @@ Skills Agent 返回包含以下字段时，Kernel **必须**主动输出：
 | Agent | 配置文件 | 职责 | 专属特性 |
 |:---|:---|:---|:---|
 | **worker** | `.claude/agents/worker_agent.md` | 执行 `bin/` 脚本 | 幂等性 (5s缓存) |
-| **skills** | `.claude/agents/skills_agent.md` | 执行已安装技能 | 超时 (60s限制) |
+| **skills** | `.claude/agents/skills_agent.md` | 执行已安装技能 | 超时 (90s限制) |

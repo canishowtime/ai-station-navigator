@@ -1,40 +1,10 @@
 {
-  "last_updated": "2026-02-03T13:24:51.742893",
+  "last_updated": "2026-02-08T16:31:02.934255",
   "hooks": {
-    "log_rotate": {
-      "last_run": null,
-      "run_count": 0,
-      "enabled": true
-    },
-    "cleanup_workspace": {
-      "last_run": null,
-      "run_count": 0,
-      "enabled": true
-    },
-    "check_disk_space": {
-      "last_run": null,
-      "run_count": 0,
-      "enabled": true
-    },
-    "cleanup_old_downloads": {
-      "last_run": null,
-      "run_count": 0,
-      "enabled": true
-    },
-    "create_delivery_snapshot": {
-      "last_run": null,
-      "run_count": 0,
-      "enabled": true
-    },
-    "refresh_skills_on_start": {
-      "last_run": null,
-      "run_count": 0,
-      "enabled": true
-    },
-    "security_scan_on_install": {
-      "last_run": "2026-02-03T13:24:51.742893",
-      "run_count": 149,
-      "enabled": true
+    "cleanup_nul_files": {
+      "last_run": "2026-02-08T16:31:02.934255",
+      "run_count": 4,
+      "enabled": false
     }
   }
 }

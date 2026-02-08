@@ -12,6 +12,8 @@ color: green
 **工作目录**: 项目根目录 - **禁止切换目录**
 **返回规范**: 严格遵循 `docs/worker_agent_Protocol.md`
 **公理**: 无授权不产生额外作用 (No Side-Effect)。
+**平台**: Windows (win32)
+**禁止输出重定向到nul** - Windows下禁用 `> nul`/`> /dev/null`，避免创建物理nul文件导致文件系统错误。如需静默执行，忽略输出即可。
 **关键文件**:
 - 注册表: `docs/commands.md` (工具调用需严格遵循)
 - 文件系统/熵: `docs/filesystem.md`(查找文件前需先参考)
@@ -235,5 +237,14 @@ python bin/file_editor.py <operation> [args...]
 **mybox 结构**: workspace(工作文件), temp(临时), cache(缓存), logs(日志)。
 **禁止混乱目录**: 使用规范目录，禁止创建 analysis/ 等未规范目录。
 **依赖管理**: `python -m pip install <package>` (禁止全局 pip)。
-**GIthub clone**: clone操作务必加载根目录加速器 `config.json` 
+**GIthub clone**: clone操作务必加载根目录加速器 `config.json`
 **文档优先**: 先查 `docs/` 再操作。连续失败 2 次 -> 停止并询问。
+
+### Git Bash 使用规范 (Windows 保留名称防护)
+**禁止操作**（避免创建非法文件）:
+- ❌ `> nul` / `2> nul` / `&> nul`
+- ❌ 直接操作保留名称: con, prn, aux, nul, com[1-9], lpt[1-9]
+
+**正确重定向**:
+- ✅ `> /dev/null` / `2>&1` / `&> /dev/null`
+- ✅ 省略重定向（允许输出显示）

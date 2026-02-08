@@ -959,12 +959,29 @@ def main():
                         print(f"  {log}")
 
                 print("\n" + "=" * 60)
-                print("[DONE] 工作流执行完成")
 
                 # checkpoint 数据库保留（用于调试和状态追踪）
-                # 如需清理，手动删除：rm mybox/temp/langgraph/checkpoints/skill_install.db
+                # 如需清理，手动删除：rm mybox/temp/langraph/checkpoints/skill_install.db
 
-                return 0
+                # 根据安装结果决定退出码
+                installed = final.values.get("installed_skills", [])
+                failed = final.values.get("failed_skills", [])
+
+                # 检查是否有错误日志（克隆失败等情况）
+                has_error = any("[ERROR]" in log for log in final_logs)
+
+                if len(installed) > 0:
+                    print("[DONE] 工作流执行完成: 安装成功")
+                    return 0
+                elif len(failed) > 0:
+                    print("[FAIL] 工作流执行完成: 安装失败")
+                    return 1
+                elif has_error:
+                    print("[FAIL] 工作流执行完成: 克隆或处理失败")
+                    return 1
+                else:
+                    print("[DONE] 工作流执行完成: 无技能需安装")
+                    return 0
 
     except KeyboardInterrupt:
         print("\n[INTERRUPT] 用户中断")

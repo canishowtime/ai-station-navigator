@@ -1,16 +1,12 @@
 # Claude Skills 功能分类汇总
 
-> **📋 数据源声明**：本文档是技能库的**主数据源 (Master Source)**，所有技能仓库和子技能条目在此维护。
->
-> **🔗 同步关系**：`docs/skills-mapping.md` 从本文档自动派生，用于子技能路由查询。两文档必须保持同步。
->
 > **⚠️ 免责声明**：以下链接仅供 Skills 安装测试，具体用途、安全性和限制请务必查阅对应仓库说明。本文档仅作功能汇总，版权归属原项目作者。
 
 <div align="center">
 
 | 📅 分析日期 | 📦 仓库总数 | 🧩 技能总数 |
 | :---: | :---: | :---: |
-| 2026-02-03 | 15 | 120 |
+| 2026-02-07 | 15 | 135 |
 
 </div>
 
@@ -72,6 +68,7 @@
 | **🎨 设计与视觉** | `canvas-design` | 创建视觉艺术 (PNG/PDF) |
 | | `algorithmic-art` | p5.js 算法艺术创作 |
 | | `frontend-design` | 前端界面创建 |
+| | `tailwindcss` | Tailwind CSS 样式框架 |
 | | `slack-gif-creator` | Slack 动画 GIF 制作 |
 | **📄 文档处理** | `docx` / `xlsx` | Word / Excel 处理 |
 | | `pdf` | PDF 操作工具包 |
@@ -79,7 +76,7 @@
 | | `doc-coauthoring` | 文档协作工作流 |
 | **🏗️ 构建与开发** | `mcp-builder` | MCP 服务器构建指南 |
 | | `web-artifacts-builder` | 复杂 Web 产物构建 |
-| | `webapp-testing` | Web 应用测试 |
+| | `web-app-testing` | Web 应用测试 |
 
 ### 📦 [JimLiu/baoyu-skills](https://github.com/JimLiu/baoyu-skills)
 **简介**：Baoyu 分享的 Claude Code 技能集合，专注于内容生成、发布与 AI 图像处理。
@@ -140,7 +137,7 @@
 | `onboarding-cro` | **引导优化**：优化新用户引导流程转化率 |
 | `page-cro` | **页面优化**：优化单页转化率 |
 | `paid-ads` | **付费广告**：管理和优化付费广告活动 |
-| `paywall-upgrade-cro` | **付费墙优化**：优化付费墙升级转化率 |
+| `paypal-upgrade-cro` | **PayPal 升级优化**：优化 PayPal 升级转化率 |
 | `popup-cro` | **弹窗优化**：优化弹窗转化率 |
 | `pricing-strategy` | **定价策略**：制定和优化产品定价策略 |
 | `product-marketing-context` | **产品营销**：提供产品营销背景和策略 |
@@ -189,10 +186,9 @@
 
 ### 📦 [muratcankoylan/Agent-Skills-for-Context-Engineering](https://github.com/muratcankoylan/Agent-Skills-for-Context-Engineering)
 **上下文工程与 Agent 设计**：
-*   **上下文处理**：压缩、优化、降级诊断
-*   **系统设计**：多智能体模式、工具设计、文件系统上下文卸载
-*   **评估调试**：Agent 评估、推理追踪优化 (Reasoning Trace)
-*   **认知建模**：BDI 精神状态建模、记忆系统实现
+| 技能 | 功能 |
+|:---|:---|
+| `context-engineering-collection` | 上下文工程集合包（含10个子技能：context-compression, context-optimization, context-degradation-diagnosis, multiagent-patterns, tool-design, filesystem-context-unload, agent-evaluation, reasoning-trace-optimization, bdi-modeling, memory-system） |
 
 ### 📦 [trailofbits/skills](https://github.com/trailofbits/skills)
 **Trail of Bits 安全研究技能集**：安全研究、漏洞检测、审计工作流工具
@@ -213,8 +209,47 @@
 | `semgrep-rule-variant-creator` | 将现有 Semgrep 规则移植到新目标语言 |
 | `sharp-edges` | 识别易错 API、危险配置和隐患设计 |
 | `static-analysis` | 静态分析工具包 (CodeQL, Semgrep, SARIF 解析) |
-| `testing-handbook-skills` | 测试手册技能：Fuzzers、静态分析、Sanitizers、覆盖率 |
+| `testing-handbook-generator` | 测试手册技能：Fuzzers、静态分析、Sanitizers、覆盖率 |
 | `variant-analysis` | 基于模式分析在代码库中发现类似漏洞 |
+| `codeql` | CodeQL 静态分析工具 |
+| `sarif-parsing` | SARIF 结果解析 |
+| `semgrep` | Semgrep 静态分析 |
+| `insecure-defaults` | 识别不安全的默认配置 |
+| `modern-python` | 现代 Python 安全最佳实践 |
+| `guidelines-advisor` | 安全指南顾问 |
+| `secure-workflow-guide` | 安全工作流指南 |
+
+#### 🔍 智能合约漏洞扫描器
+| 技能 | 功能 |
+|:---|:---|
+| `algorand-vulnerability-scanner` | Algorand 区块链漏洞扫描 |
+| `cairo-vulnerability-scanner` | Cairo 智能合约漏洞扫描 |
+| `cosmos-vulnerability-scanner` | Cosmos 区块链漏洞扫描 |
+| `solana-vulnerability-scanner` | Solana 区块链漏洞扫描 |
+| `substrate-vulnerability-scanner` | Substrate 链漏洞扫描 |
+| `ton-vulnerability-scanner` | TON 区块链漏洞扫描 |
+| `audit-prep-assistant` | 审计准备助手 |
+| `code-maturity-assessor` | 代码成熟度评估 |
+| `token-integration-analyzer` | 代币集成分析 |
+
+#### 🧪 模糊测试工具
+| 技能 | 功能 |
+|:---|:---|
+| `aflpp` | AFL++ 模糊测试 |
+| `atheris` | Atheris 模糊测试 |
+| `cargo-fuzz` | Rust Cargo 模糊测试 |
+| `libafl` | LibAFL 模糊测试框架 |
+| `libfuzzer` | LibFuzzer 模糊测试 |
+| `ossfuzz` | OSS-Fuzz 集成 |
+| `ruzzy` | Ruzzy 模糊测试 |
+| `address-sanitizer` | AddressSanitizer 内存错误检测 |
+| `constant-time-testing` | 常量时间测试 |
+| `coverage-analysis` | 覆盖率分析 |
+| `fuzzing-dictionary` | 模糊测试字典 |
+| `fuzzing-obstacles` | 模糊测试障碍 |
+| `harness-writing` | 测试工具编写 |
+| `wycheproof` | Wycheproof 密码测试向量 |
+| `yara-rule-authoring` | YARA 规则编写 |
 
 #### ✅ 验证
 | 技能 | 功能 |
@@ -246,7 +281,7 @@
 #### 👥 团队管理
 | 技能 | 功能 |
 | :--- | :--- |
-| `culture-index` | 解释个人和团队的 Culture Index 调查结果 |
+| `interpreting-culture-index` | 解释个人和团队的 Culture Index 调查结果 |
 
 #### 🛠️ 工具
 | 技能 | 功能 |
@@ -261,20 +296,36 @@
 
 | 分类 | 技能 | 功能 |
 | :--- | :--- | :--- |
-| **📄 文档处理** | `docx`/`pdf`/`ppt`/`xlsx` | Office 全家桶处理套件 |
+| **📄 文档处理** | `docx`/`pdf`/`pptx`/`xlsx` | Office 全家桶处理套件 |
 | **🛠️ 开发工具** | `artifacts-builder` | 创建多组件工件 |
 | | `mcp-builder` | MCP 协议构建指南 |
 | | `skill-creator` | 技能开发工具链 |
 | | `langsmith-fetch` | LangChain/LangGraph 调试 |
-| **⚡ 生产力** | `connect-apps` | 连接外部应用 (Gmail/Slack/GitHub) |
+| | `template-skill` | 模板技能 |
+| **⚡ 生产力** | `connect` | 连接外部应用 (Gmail/Slack/GitHub) |
+| | `connect-apps` | 连接外部应用 (Gmail/Slack/GitHub) |
 | | `file-organizer` | 智能文件/发票整理 |
-| | `meeting-insights` | 会议洞察分析 |
-| | `webapp-testing` | Web 应用测试 |
-| **✍️ 内容创作** | `tailored-resume` | 定制简历生成 |
-| | `content-research` | 内容研究与写作 |
-| | `twitter-optimizer` | Twitter 算法优化 |
-| | `competitive-ads` | 竞品广告分析 |
+| | `meeting-insights-analyzer` | 会议洞察分析 |
+| | `web-app-testing` | Web 应用测试 |
+| | `invoice-organizer` | 发票整理 |
+| | `domain-name-brainstormer` | 域名名生成 |
+| | `raffle-winner-picker` | 抽奖工具 |
+| | `youtube-downloader` | YouTube 下载 |
+| **✍️ 内容创作** | `targeted-resume-generator` | 定制简历生成 |
+| | `content-research-writer` | 内容研究与写作 |
+| | `twitter-algorithm-optimizer` | Twitter 算法优化 |
+| | `competitive-ads-extractor` | 竞品广告分析 |
+| | `slack-gif-creator` | Slack 动画 GIF 制作 |
+| | `changelog-generator` | 变更日志自动生成 |
+| **📊 分析工具** | `developer-growth-analysis` | 开发者成长分析 |
+| | `lead-research-assistant` | 潜在客户研究 |
+| **🎨 设计增强** | `brand-guidelines` | Anthropic 品牌样式应用 |
+| | `theme-factory` | 主题样式工厂 |
+| | `image-enhancer` | 图像增强 |
+| **📢 内部沟通** | `internal-comms` | 内部通信模板 |
+| | `skill-share` | Slack 技能分享 |
+| | `whatsapp-integration` | WhatsApp 集成 |
 
 ---
 
-> 📝 **备注**：本文档更新于 2026-02-03，已同步 GitHub 仓库最新技能列表。
+> 📝 **备注**：本文档更新于 2026-02-07，已同步 GitHub 仓库最新技能列表，修正名称不一致、补充缺失技能。

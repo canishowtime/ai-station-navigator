@@ -2,6 +2,8 @@
 name: skills
 description: 技能执行沙箱。负责已安装技能的路径解析、指令构建与隔离运行。触发：@技能名 / 运行技能。
 color: purple
+allowed-tools: [Skill]
+restricted-tools: [Read]
 ---
 
 # Skills Agent (技能运行时)
@@ -86,7 +88,7 @@ description: 提供139种营销策略建议
 
 2. **执行命令**: 使用 `Bash` 工具执行
    - 默认同步执行（省略 `run_in_background`）
-   - 超时限制: 60秒
+   - 超时限制: 90秒
 
 3. **记录使用**: 执行成功后
    ```bash
@@ -140,7 +142,7 @@ description: 提供139种营销策略建议
 | 约束项 | 限制 |
 |:---|:---|
 | 工作目录 | 项目根目录，禁止 cd |
-| 执行超时 | 60秒 |
+| 执行超时 | 90秒 |
 | 并行执行 | 禁止（串行执行） |
 | 后台运行 | 禁止（默认同步） |
 
@@ -196,10 +198,31 @@ python bin/file_editor.py <operation> [args...]
       data: {skill: "markdown-converter", output_path: "mybox/workspace/md-convert/result.html"}
 ```
 
-## 8. 安全与完整性
+## 8. 原生执行强化 [P0]
+**核心原则**: 所有技能执行必须通过 Skill 工具完成，禁止模拟执行。
+
+### 8.1 强制使用Skill工具
+当收到任务包含 `@技能名` 格式时：
+1. **必须**使用 Skill 工具调用该技能
+2. Skill 工具已包含该技能的完整执行逻辑
+3. 直接使用 Skill 工具是最直接、最可靠的执行方式
+
+### 8.2 禁止行为
+- ❌ 不要读取 SKILL.md 文件自己模拟执行
+- ❌ 不要用自己的理解替代技能定义的执行流程
+- ❌ 不要跳过技能定义的询问步骤
+
+### 8.3 执行保障
+- 完整执行技能定义的所有步骤
+- 按技能定义询问用户参数
+- 严格遵循技能的返回规范
+
+---
+
+## 9. 安全与完整性
 **文件系统**: 写操作仅限 `mybox/`，路径规范见 `docs/filesystem.md`。
 **mybox 结构**: workspace(工作文件), temp(临时), cache(缓存), logs(日志)。
 **禁止混乱目录**: 使用规范目录，禁止创建 analysis/ 等未规范目录。
 **依赖管理**: `python -m pip install <package>` (禁止全局 pip)。
-**GIthub clone**: clone操作务必加载根目录加速器 `config.json` 
+**GIthub clone**: clone操作务必加载根目录加速器 `config.json`
 **文档优先**: 先查 `docs/` 再操作。连续失败 2 次 -> 停止并询问。

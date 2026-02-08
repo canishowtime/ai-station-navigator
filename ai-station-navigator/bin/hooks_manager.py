@@ -20,14 +20,12 @@ v2.0 - 简化版
 """
 
 import json
-import os
-import shutil
 import subprocess
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Optional
 
 # 添加项目 lib 目录到 sys.path（绿色包预置依赖）
 _lib_dir = Path(__file__).parent.parent / "lib"
@@ -222,76 +220,16 @@ class HooksManager:
         状态将在 _load_state() 后通过 _save_state() 同步。
         """
 
-        # Hook 1: 日志轮转
+        # Hook 1: 会话开始前清理nul文件
         self.register_hook(
             Hook(
-                name="log_rotate",
+                name="cleanup_nul_files",
                 hook_type=HookType.ON_SESSION_START,
-                description="轮转日志文件（保留最近 7 天）",
-                action=self._action_log_rotate,
-                condition=lambda: self._should_rotate_logs()
+                description="会话开始前清理根目录的nul文件",
+                action=self._action_cleanup_nul_files
             ),
             save_state=False
         )
-
-        # Hook 2: 工作区清理
-        self.register_hook(
-            Hook(
-                name="cleanup_workspace",
-                hook_type=HookType.ON_DELIVERY,
-                description="清理 workspace/ 目录",
-                action=self._action_cleanup_workspace
-            ),
-            save_state=False
-        )
-
-        # Hook 3: 磁盘检查
-        self.register_hook(
-            Hook(
-                name="check_disk_space",
-                hook_type=HookType.ON_SESSION_START,
-                description="检查磁盘空间，发出警告",
-                action=self._action_check_disk_space
-            ),
-            save_state=False
-        )
-
-        # Hook 4: 清理过期下载
-        self.register_hook(
-            Hook(
-                name="cleanup_old_downloads",
-                hook_type=HookType.ON_SESSION_START,
-                description="清理 7 天前的下载文件",
-                action=self._action_cleanup_old_downloads,
-                condition=lambda: self._should_cleanup_downloads()
-            ),
-            save_state=False
-        )
-
-        # Hook 5: 交付后创建快照
-        self.register_hook(
-            Hook(
-                name="create_delivery_snapshot",
-                hook_type=HookType.ON_DELIVERY,
-                description="为最新交付创建快照",
-                action=self._action_create_delivery_snapshot
-            ),
-            save_state=False
-        )
-
-        # Hook 6: 会话开始时获取技能数据
-        self.register_hook(
-            Hook(
-                name="refresh_skills_on_start",
-                hook_type=HookType.ON_SESSION_START,
-                description="会话开始时自动刷新技能数据",
-                action=self._action_refresh_skills
-            ),
-            save_state=False
-        )
-
-        # Note: 技能安装/卸载的数据库同步已移至 skill_manager.py
-        # 移除了 sync_skill_install_status 和 sync_skill_uninstall_status Hooks
 
     def register_hook(self, hook: Hook, save_state: bool = True):
         """注册 Hook
@@ -409,229 +347,33 @@ class HooksManager:
     # Hook 动作实现
     # ======================================================================
 
-    def _action_log_rotate(self) -> Dict[str, Any]:
-        """日志轮转动作"""
-        if not LOGS_DIR.exists():
-            return {"success": True, "message": "日志目录不存在，跳过轮转"}
+    def _action_cleanup_nul_files(self) -> Dict[str, Any]:
+        """清理根目录的nul文件（已禁用 - 仅记录状态）
 
-        rotated = []
-        now = datetime.now()
-        cutoff_time = now - timedelta(days=7)
-
-        for log_file in LOGS_DIR.glob("*.log"):
-            if log_file.stat().st_mtime < cutoff_time.timestamp():
-                # 归档旧日志
-                archive_name = f"{log_file.stem}.{log_file.stat().st_mtime}.old"
-                archive_path = LOGS_DIR / archive_name
-                log_file.rename(archive_path)
-                rotated.append(log_file.name)
-
-        # 删除 30 天前的归档
-        for archive in LOGS_DIR.glob("*.old"):
-            if archive.stat().st_mtime < (now - timedelta(days=30)).timestamp():
-                archive.unlink()
-                rotated.append(f"删除归档: {archive.name}")
+        说明：由于Windows对nul文件名的特殊处理，自动清理存在兼容性问题。
+             此hook保留为占位符，不执行任何删除操作。
+        """
+        if self.verbose:
+            print(f"  [i] cleanup_nul_files hook已禁用，不执行删除操作")
 
         return {
             "success": True,
-            "message": f"轮转了 {len(rotated)} 个日志文件",
-            "rotated_files": rotated
+            "message": "hook已禁用",
+            "deleted_files": [],
+            "skipped_files": []
         }
 
-    def _action_cleanup_workspace(self) -> Dict[str, Any]:
-        """清理工作区动作"""
-        current_dir = WORKSPACE_DIR / "current"
-
-        if not current_dir.exists():
-            return {"success": True, "message": "工作区不存在，无需清理"}
-
-        deleted = []
-        total_size = 0
-
-        for item in current_dir.glob("*"):
-            size = item.stat().st_size if item.is_file() else 0
-            try:
-                if item.is_dir():
-                    shutil.rmtree(item)
-                else:
-                    item.unlink()
-                deleted.append(item.name)
-                total_size += size
-            except Exception as e:
-                if self.verbose:
-                    print(f"  [!] 删除失败: {item.name} - {e}")
+        message = f"清理了 {len(deleted)} 个nul文件"
+        if skipped:
+            message += f" (跳过 {len(skipped)} 个大文件)"
 
         return {
             "success": True,
-            "message": f"清理了 {len(deleted)} 个项目，释放 {self._format_size(total_size)}",
-            "deleted_items": deleted,
-            "space_freed": self._format_size(total_size)
+            "message": message,
+            "deleted_files": deleted,
+            "skipped_files": skipped
         }
 
-    def _action_check_disk_space(self) -> Dict[str, Any]:
-        """检查磁盘空间动作"""
-        usage = self._get_disk_usage()
-
-        # 检查是否超过阈值
-        warnings = []
-        for name, info in usage.items():
-            size_gb = info["size_bytes"] / (1024 ** 3)
-            if size_gb > 1.0:  # 超过 1GB
-                warnings.append(f"{name}: {self._format_size(info['size_bytes'])}")
-
-        if warnings:
-            return {
-                "success": True,
-                "status": "partial",
-                "message": f"发现 {len(warnings)} 个大目录",
-                "warnings": warnings,
-                "usage": usage
-            }
-        else:
-            return {
-                "success": True,
-                "message": "磁盘空间正常",
-                "usage": usage
-            }
-
-    def _action_cleanup_old_downloads(self) -> Dict[str, Any]:
-        """清理过期下载动作"""
-        downloads_dir = SANDBOX_DIR / "downloads"
-
-        if not downloads_dir.exists():
-            return {"success": True, "message": "下载目录不存在"}
-
-        deleted = []
-        cutoff_time = datetime.now() - timedelta(days=7)
-
-        for item in downloads_dir.glob("*"):
-            if item.stat().st_mtime < cutoff_time.timestamp():
-                try:
-                    if item.is_dir():
-                        shutil.rmtree(item)
-                    else:
-                        item.unlink()
-                    deleted.append(item.name)
-                except Exception as e:
-                    if self.verbose:
-                        print(f"  [!] 删除失败: {item.name} - {e}")
-
-        return {
-            "success": True,
-            "message": f"清理了 {len(deleted)} 个过期下载",
-            "deleted_items": deleted
-        }
-
-    def _action_create_delivery_snapshot(self) -> Dict[str, Any]:
-        """创建交付快照动作"""
-        if not DELIVERY_ROOT.exists():
-            return {"success": True, "message": "交付目录不存在"}
-
-        latest_link = DELIVERY_ROOT / "latest"
-        if not latest_link.exists():
-            return {"success": True, "message": "没有 latest 快捷方式"}
-
-        # 获取 latest 指向的目录
-        try:
-            target = latest_link.resolve()
-            snapshot_name = f"snapshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            snapshot_path = DELIVERY_ROOT / snapshot_name
-
-            # 复制到快照
-            shutil.copytree(target, snapshot_path)
-
-            return {
-                "success": True,
-                "message": f"创建快照: {snapshot_name}",
-                "snapshot_path": str(snapshot_path)
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "message": f"创建快照失败: {str(e)}"
-            }
-
-
-    def _action_refresh_skills(self) -> Dict[str, Any]:
-        """会话开始时刷新技能数据（占位实现）"""
-        # 这个 Hook 目前是占位符，可以后续添加实际逻辑
-        # 例如：刷新技能索引缓存等
-        return {
-            "status": "success",
-            "message": "技能数据刷新完成"
-        }
-
-    # ======================================================================
-    # 条件检查
-    # ======================================================================
-
-    def _should_rotate_logs(self) -> bool:
-        """检查是否需要轮转日志"""
-        if not LOGS_DIR.exists():
-            return False
-
-        # 检查是否有超过 7 天的日志
-        cutoff_time = datetime.now() - timedelta(days=7)
-        for log_file in LOGS_DIR.glob("*.log"):
-            if log_file.stat().st_mtime < cutoff_time.timestamp():
-                return True
-        return False
-
-    def _should_cleanup_downloads(self) -> bool:
-        """检查是否需要清理下载"""
-        downloads_dir = SANDBOX_DIR / "downloads"
-        if not downloads_dir.exists():
-            return False
-
-        # 检查是否有超过 7 天的下载
-        cutoff_time = datetime.now() - timedelta(days=7)
-        for item in downloads_dir.glob("*"):
-            if item.stat().st_mtime < cutoff_time.timestamp():
-                return True
-        return False
-
-    # ======================================================================
-    # 工具方法
-    # ======================================================================
-
-    def _get_disk_usage(self) -> Dict[str, Any]:
-        """获取磁盘使用情况"""
-        usage = {}
-
-        for name, path in [
-            ("sandbox", SANDBOX_DIR),
-            ("workspace", WORKSPACE_DIR),
-            ("downloads", SANDBOX_DIR / "downloads"),
-            ("logs", LOGS_DIR),
-            ("delivery", DELIVERY_ROOT)
-        ]:
-            if path.exists():
-                size = 0
-                try:
-                    for f in path.rglob("*"):
-                        try:
-                            if f.is_file() and not f.is_symlink():
-                                size += f.stat().st_size
-                        except (FileNotFoundError, PermissionError):
-                            continue
-                except Exception:
-                    pass
-
-                usage[name] = {
-                    "size_bytes": size,
-                    "size": self._format_size(size)
-                }
-
-        return usage
-
-    def _format_size(self, size_bytes: int) -> str:
-        """格式化字节大小"""
-        size = size_bytes
-        for unit in ["B", "KB", "MB", "GB"]:
-            if size < 1024:
-                return f"{size:.1f} {unit}"
-            size /= 1024
-        return f"{size:.1f} TB"
 
     # ======================================================================
     # 状态持久化

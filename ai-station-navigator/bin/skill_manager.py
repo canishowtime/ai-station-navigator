@@ -2225,6 +2225,23 @@ def main():
         # 如果有成功删除的技能，失效搜索索引缓存
         if success_count > 0:
             SkillSearcher.invalidate_cache()
+            # 更新技能映射表
+            try:
+                import subprocess
+                result = subprocess.run(
+                    [sys.executable, str(BASE_DIR / "bin" / "update_skills_mapping.py")],
+                    cwd=BASE_DIR,
+                    capture_output=True,
+                    timeout=30
+                )
+                if result.returncode == 0:
+                    info("技能映射表已同步更新")
+                else:
+                    warn(f"映射表更新失败: {result.stderr.decode()[:100]}")
+            except subprocess.TimeoutExpired:
+                warn("映射表更新超时")
+            except Exception as e:
+                warn(f"映射表更新失败: {e}")
         info(f"批量删除完成: 成功 {success_count}/{len(skill_names)}")
         if failed_list:
             error(f"失败: {', '.join(failed_list)}")
@@ -2381,6 +2398,25 @@ def main():
         print(f"安装源: {args.source}")
         print(f"处理技能数: {len(skills_to_process)}")
         print(f"安装成功: {len(results.get('success', []))}")
+
+        # 7. 更新技能映射表（仅当有成功安装时）
+        if results.get('success'):
+            try:
+                import subprocess
+                result = subprocess.run(
+                    [sys.executable, str(BASE_DIR / "bin" / "update_skills_mapping.py")],
+                    cwd=BASE_DIR,
+                    capture_output=True,
+                    timeout=30
+                )
+                if result.returncode == 0:
+                    info("技能映射表已同步更新")
+                else:
+                    warn(f"映射表更新失败: {result.stderr.decode()[:100]}")
+            except subprocess.TimeoutExpired:
+                warn("映射表更新超时")
+            except Exception as e:
+                warn(f"映射表更新失败: {e}")
 
         return 0
 

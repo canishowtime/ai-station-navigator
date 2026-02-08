@@ -1,0 +1,14 @@
+# Runtime files
+scripts/*.log
+scripts/transcript_status.json
+scripts/failed_transcripts.txt
+
+# Backups
+references_backup_*/
+
+# Archives
+*.zip
+
+# macOS
+.DS_Store
+**/.DS_Store

@@ -2,8 +2,8 @@
   "permissions": {
     "allow": [
       "Read(./)",
-      "Write(./mybox/*)",
-      "Edit(./mybox/*)",
+      "Write(./mybox/**)",
+      "Edit(./mybox/**)",
       "Glob(./)",
       "Grep(./)",
       "WebSearch",

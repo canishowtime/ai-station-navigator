@@ -184,7 +184,7 @@ class FormatDetector:
             (是否有效, 错误信息)
         """
         # 基础格式检查
-        github_pattern = r'^https?://github\.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+(?:/tree/[^/\s]+(?:/[\w\-./]+)?)?$'
+        github_pattern = r'^https?://github\.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+(?:/tree/[^/\s]+(?:/[\w\-./]+)?)?/?$'
         if not re.match(github_pattern, url):
             return False, f"无效的 GitHub URL 格式: {url}"
 

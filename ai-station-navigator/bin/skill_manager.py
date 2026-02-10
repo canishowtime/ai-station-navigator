@@ -1379,7 +1379,7 @@ _config_mtime: Optional[float] = None
 def load_config(use_cache: bool = True) -> dict:
     """加载配置文件"""
     global _config_cache, _config_mtime
-    config_file = BASE_DIR / ".claude" / "config" / "config.yml"
+    config_file = BASE_DIR / "config.json"
     if not config_file.exists():
         return {}
     current_mtime = config_file.stat().st_mtime
@@ -1387,7 +1387,7 @@ def load_config(use_cache: bool = True) -> dict:
         return _config_cache
     try:
         with open(config_file, "r", encoding="utf-8") as f:
-            _config_cache = yaml.safe_load(f) or {}
+            _config_cache = json.load(f) or {}
             _config_mtime = current_mtime
         return _config_cache
     except Exception:
@@ -2445,15 +2445,14 @@ def main():
             "fixed": []
         }
 
-        config_file = BASE_DIR / ".claude" / "config" / "config.yml"
+        config_file = BASE_DIR / "config.json"
 
         # 检查配置文件是否存在
         if not config_file.exists():
             result["valid"] = False
-            result["issues"].append("配置文件不存在: .claude/config/config.yml")
+            result["issues"].append("配置文件不存在: config.json")
 
             if getattr(args, 'fix', False):
-                config_file.parent.mkdir(parents=True, exist_ok=True)
                 default_config = {
                     "git": {
                         "proxies": [
@@ -2481,7 +2480,7 @@ def main():
                     }
                 }
                 with open(config_file, "w", encoding="utf-8") as f:
-                    yaml.dump(default_config, f, allow_unicode=True)
+                    json.dump(default_config, f, indent=2, ensure_ascii=False)
                 result["fixed"].append("已创建默认配置文件")
 
         # 验证配置内容
@@ -2513,7 +2512,7 @@ def main():
                 # 如果有修复，写回文件
                 if getattr(args, 'fix', False) and result["fixed"]:
                     with open(config_file, "w", encoding="utf-8") as f:
-                        yaml.dump(config, f, allow_unicode=True)
+                        json.dump(config, f, indent=2, ensure_ascii=False)
                     result["valid"] = True
 
             except Exception as e:

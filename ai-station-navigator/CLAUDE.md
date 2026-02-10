@@ -7,7 +7,9 @@
 **公理**:
 1. 无授权不产生额外作用 (No Side-Effect)。
 2. 极简输出 (仅保留数据与状态，拒绝废话)。
-3. **禁止输出重定向到nul** - Windows下禁用 `> nul`/`> /dev/null`，避免创建物理nul文件导致文件系统错误。如需静默执行，忽略输出即可。
+3. 多步任务串行派发，禁止并行；
+**禁止输出重定向到nul** 
+- Windows下禁用 `> nul`/`> /dev/null`，避免创建物理nul文件导致文件系统错误。如需静默执行，忽略输出即可。
 **关键文件**:
 - 注册表: `docs/commands.md` (工具调用需严格遵循)
 - 文件系统/熵: `docs/filesystem.md`(查找文件前需先参考)
@@ -28,10 +30,10 @@
 
 ### 2.2 感知与意图
 **路由优先级** (高优先级阻断低优先级):
-1. **上下文检查** [P0]: 若为上一轮 Skill/MCP 任务后续 → 自动路由回同一子智能体
+1. **上下文检查** [P0]: 若为上一轮 Skill/bash 任务后续 → 自动路由回同一子智能体
 2. **强制路由验证** [P0-FORCE]: 禁止 Kernel 直接使用 Bash/Skill 工具，必须按派发协议Protocol对接子智能体，使用 `Task(subagent_type, prompt)` 派发；禁止使用 run_in_background=true，直接解析 Task 返回值中的数据；
-- 用户意图是 `执行Bash`|`install`|`执行脚本`→ 路由至 `worker_agent` 执行；多步任务分多次派发，禁止并行；对接内容中“文件路径”优先使用引用方式，禁止读取和嵌入内容；
-- 用户意图是 `执行skills`|`调用技能` → 路由至 `skills_agent` 执行；多步任务分多次派发，禁止并行；派发任务格式“使用 Skill 工具调用 @<技能名>”；对接内容中”文件路径”优先使用引用方式，禁止读取和嵌入内容；多步任务分多次派发，禁止并行；
+- 用户意图是 `执行Bash`|`install`|`执行脚本`→ 路由至 `worker_agent` 执行；多步任务串行派发，禁止并行；对接内容中“文件路径”优先使用引用方式，禁止读取和嵌入内容；
+- 用户意图是 `执行skills`|`调用技能` → 路由至 `skills_agent` 执行；多步任务串行派发，禁止并行；派发任务格式“使用 Skill 工具调用 @<技能名>”；对接内容中”文件路径”优先使用引用方式，禁止读取和嵌入内容；多步任务分多次派发，禁止并行；
 3.**信息缺失**:  Kernel 检查发现参数缺失，直接询问用户补充
 
 ### 2.3 用户需求覆盖判定
@@ -64,14 +66,13 @@
 
 ### 2.5 执行参考
 **操作矩阵**(非强制顺序，按需调用):
-- **获取**: `skill_install_workflow.py <url> [--skill <name>] [--force]` → `worker_agent` → 子技能名→查`skills-mapping.md`→找到映射→执行工作流→clone→scan→LLM分析→install→未找到→回退常规流程
-- **查询**: `skill_manager.py search <kw>` → `worker_agent` → 精确/语义匹配→置信度决策→信息完整→派发`skills`子智能体→缺失→询问参数
-- **验证**: `skill_manager.py validate <path>` → `worker_agent` → 验证技能目录结构
-- **维护**: `skill_manager.py list` → `worker_agent` → 直接输出
-- **清理**: `skill_manager.py uninstall <name>` → `worker_agent` → 直接执行(自动同步DB)
-- **记录**: `skill_manager.py record <name>` → `worker_agent` → 记录使用(搜索加权)
-- **格式**: `skill_manager.py formats` → `worker_agent` → 列出支持的技能格式
-- **使用**: `@技能名` → skills → 路由至`skills_agent`→ 使用 Skill 工具调用 → 串行执行→返回结果
+- **安装**: `skill_install_workflow.py <url> [--skill <name>] [--force]` → `worker_agent` → 完整工作流
+- **安装**: `skill_manager.py install <src>` → `worker_agent` → 快速安装
+- **卸载**: `skill_manager.py uninstall <name> [...]` → `worker_agent` → 支持批量
+- **搜索**: `skill_manager.py search <kw>` → `worker_agent` → 精确/语义匹配
+- **列表**: `skill_manager.py list` → `worker_agent` → 查看已装技能
+- **验证**: `skill_manager.py verify-config [--fix]` → `worker_agent` → 验证配置
+- **使用**: `@技能名` → `skills_agent` → 使用 Skill 工具调用
 
 ### 2.6 能力展示规则: 
 用户询问能力时，用自然语言描述"提供什么就能获得什么"，不展示命令：

@@ -7,10 +7,22 @@
 
 ## 1. 调用规范 (Dispatch Protocol)
 
-### 1.1 Task 工具签名
+### 1.1 执行模式说明 [P0]
+**同步执行架构**：Worker Agent 采用同步执行模式，任务结果直接在 `Task` 返回值中获取。
+
+```yaml
+# ✅ 正确：直接处理 Task 返回值
+result = Task("worker_agent", "列出技能", "执行 python bin/skill_manager.py list")
+# → 结果已在 result 中，无需后续检索
+
+# ❌ 错误：尝试用 TaskOutput 检索
+TaskOutput(task_id=xxx)  # → 同步任务无 task_id，会报错
+```
+
+### 1.2 Task 工具签名
 ```
 Task(
-  "worker",                    // 固定子智能体类型
+  "worker_agent",              // 固定子智能体类型
   "<3-5词任务摘要>",            // description: 任务简述
   "执行 python bin/<脚本> [参数]", // prompt: 完整执行指令
   {
@@ -19,7 +31,7 @@ Task(
 )
 ```
 
-### 1.2 幂等性保证 [P0-LOCK]
+### 1.3 幂等性保证 [P0-LOCK]
 ```yaml
 # 防重复执行规则
 缓存时间: 5秒
@@ -55,7 +67,7 @@ Task(
 
 ### 2.1 标准格式
 ```
-<status> worker <summary>
+<status> worker_agent <summary>
   state: <code> | data: {...} | meta: {...}
 ```
 
@@ -71,28 +83,28 @@ Task(
 
 ```yaml
 # 成功
-✅ worker 扫描完成: 新增 2 个, 更新 3 个
+✅ worker_agent 扫描完成: 新增 2 个, 更新 3 个
   state: success
   data: {added: ["skill_a","skill_b"], updated: ["skill_c","skill_d","skill_e"], total: 5}
-  meta: {agent: worker, time: 0.5, ts: "2025-01-29T10:30:00Z"}
+  meta: {agent: worker_agent, time: 0.5, ts: "2025-01-29T10:30:00Z"}
 
 # 缓存命中（幂等）
-⏭️ worker 缓存命中: 使用最近结果 (<5s)
+⏭️ worker_agent 缓存命中: 使用最近结果 (<5s)
   state: success
   data: {cached: true, original_result: {total: 5, skills: [...]}}
-  meta: {agent: worker, time: 0.01, ts: "2025-01-29T10:30:05Z"}
+  meta: {agent: worker_agent, time: 0.01, ts: "2025-01-29T10:30:05Z"}
 
 # 部分成功
-⚠️ worker 部分完成: 3/5 个脚本执行成功
+⚠️ worker_agent 部分完成: 3/5 个脚本执行成功
   state: partial
   data: {succeeded: ["a.py","b.py","c.py"], failed: ["d.py","e.py"]}
-  meta: {agent: worker, time: 1.2, ts: "2025-01-29T10:30:00Z"}
+  meta: {agent: worker_agent, time: 1.2, ts: "2025-01-29T10:30:00Z"}
 
 # 错误
-❌ worker RuntimeError: 脚本执行失败
+❌ worker_agent RuntimeError: 脚本执行失败
   state: error
   data: {type: "FileNotFoundError", msg: "bin/script.py not found"}
-  meta: {agent: worker, time: 0.1, ts: "2025-01-29T10:30:00Z"}
+  meta: {agent: worker_agent, time: 0.1, ts: "2025-01-29T10:30:00Z"}
 ```
 
 ---
@@ -124,7 +136,7 @@ Task(
 
 **Worker 返回格式**（未处理）：
 ```yaml
-⏸️ worker 工作流已暂停: <N> 个技能需 LLM 分析
+⏸️ worker_agent 工作流已暂停: <N> 个技能需 LLM 分析
   state: interrupted
   data: {interrupted_skills: [...], resume_command: "..."}
 ```
@@ -142,5 +154,5 @@ data:
 
 | Agent | 职责 | 专属特性 |
 |:---|:---|:---|
-| **worker** | 执行 `bin/` 脚本 | 幂等性 + Interrupt 自主处理 |
+| **worker_agent** | 执行 `bin/` 脚本 | 幂等性 + Interrupt 自主处理 |
 | **skills** | 执行已安装技能 | 超时限制 |

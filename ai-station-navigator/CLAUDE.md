@@ -29,7 +29,7 @@
 ### 2.2 感知与意图
 **路由优先级** (高优先级阻断低优先级):
 1. **上下文检查** [P0]: 若为上一轮 Skill/MCP 任务后续 → 自动路由回同一子智能体
-2. **强制路由验证** [P0-FORCE]: 禁止 Kernel 直接使用 Bash/Skill 工具，必须按派发协议Protocol对接子智能体，使用 `Task(subagent_type, prompt)` 派发
+2. **强制路由验证** [P0-FORCE]: 禁止 Kernel 直接使用 Bash/Skill 工具，必须按派发协议Protocol对接子智能体，使用 `Task(subagent_type, prompt)` 派发；禁止使用 run_in_background=true，直接解析 Task 返回值中的数据；
 - 用户意图是 `执行Bash`|`install`|`执行脚本`→ 路由至 `worker_agent` 执行；多步任务分多次派发，禁止并行；对接内容中“文件路径”优先使用引用方式，禁止读取和嵌入内容；
 - 用户意图是 `执行skills`|`调用技能` → 路由至 `skills_agent` 执行；多步任务分多次派发，禁止并行；派发任务格式“使用 Skill 工具调用 @<技能名>”；对接内容中”文件路径”优先使用引用方式，禁止读取和嵌入内容；多步任务分多次派发，禁止并行；
 3.**信息缺失**:  Kernel 检查发现参数缺失，直接询问用户补充

@@ -7,10 +7,22 @@
 
 ## 1. 调用规范 (Dispatch Protocol)
 
-### 1.1 Task 工具签名
+### 1.1 执行模式说明 [P0]
+**同步执行架构**：Skills Agent 采用同步执行模式，任务结果直接在 `Task` 返回值中获取。
+
+```yaml
+# ✅ 正确：直接处理 Task 返回值
+result = Task("skills_agent", "执行技能", "执行 @markdown-converter README.md")
+# → 结果已在 result 中，无需后续检索
+
+# ❌ 错误：尝试用 TaskOutput 检索
+TaskOutput(task_id=xxx)  # → 同步任务无 task_id，会报错
+```
+
+### 1.2 Task 工具签名
 ```
 Task(
-  "skills",                    // 固定子智能体类型
+  "skills_agent",              // 固定子智能体类型
   "<3-5词任务摘要>",            // description: 任务简述
   "执行 @<技能名> [参数]",       // prompt: 自然语言指令
   { model?: "sonnet" | "opus" | "haiku" }  // 可选模型
@@ -39,7 +51,7 @@ Task(
 
 ### 2.1 标准格式
 ```
-<status> skills <summary>
+<status> skills_agent <summary>
   state: <code> | data: {...} | meta: {...}
 ```
 
@@ -64,28 +76,28 @@ Skills Agent 返回包含以下字段时，Kernel **必须**主动输出：
 
 ```yaml
 # 成功
-✅ skills 执行成功: Markdown转换 → mybox/workspace/result.html
+✅ skills_agent 执行成功: Markdown转换 → mybox/workspace/result.html
   state: success
   data: {skill: "markdown-converter", output_path: "mybox/workspace/result.html", output_size: "12.5KB"}
-  meta: {agent: skills, time: 1.8, ts: "2025-01-29T10:30:00Z"}
+  meta: {agent: skills_agent, time: 1.8, ts: "2025-01-29T10:30:00Z"}
 
 # 等待参数
-⏸️ skills 等待参数: 需要 input_file
+⏸️ skills_agent 等待参数: 需要 input_file
   state: pending
   data: {required: ["input_file"], optional: ["format", "quality"]}
-  meta: {agent: skills, time: 0.1, ts: "2025-01-29T10:30:00Z"}
+  meta: {agent: skills_agent, time: 0.1, ts: "2025-01-29T10:30:00Z"}
 
 # 错误
-❌ skills ParamMissing: 参数不足: 需要 input_file
+❌ skills_agent ParamMissing: 参数不足: 需要 input_file
   state: error
   data: {type: "ParamMissing", msg: "Required parameter 'input_file' not provided", recoverable: true}
-  meta: {agent: skills, time: 0.2, ts: "2025-01-29T10:30:00Z"}
+  meta: {agent: skills_agent, time: 0.2, ts: "2025-01-29T10:30:00Z"}
 
 # 超时
-⏱️ skills Timeout: 执行超时 (>90秒)
+⏱️ skills_agent Timeout: 执行超时 (>90秒)
   state: timeout
   data: {skill: "large-processor", elapsed: 90, limit: 90}
-  meta: {agent: skills, time: 90, ts: "2025-01-29T10:30:00Z"}
+  meta: {agent: skills_agent, time: 90, ts: "2025-01-29T10:30:00Z"}
 ```
 
 ---
@@ -111,7 +123,7 @@ Skills Agent 返回包含以下字段时，Kernel **必须**主动输出：
 
 ### Type B (提示词技能) 返回格式
 ```yaml
-✅ skills 提示词加载: marketing-ideas
+✅ skills_agent 提示词加载: marketing-ideas
   state: success
   data: {
     skill: "marketing-ideas",
@@ -121,7 +133,7 @@ Skills Agent 返回包含以下字段时，Kernel **必须**主动输出：
     content: "<SKILL.md完整内容>",
     executable: false
   }
-  meta: {agent: skills, time: 0.1, ts: "2025-01-30T10:00:00Z"}
+  meta: {agent: skills_agent, time: 0.1, ts: "2025-01-30T10:00:00Z"}
 ```
 
 ---
@@ -130,5 +142,5 @@ Skills Agent 返回包含以下字段时，Kernel **必须**主动输出：
 
 | Agent | 配置文件 | 职责 | 专属特性 |
 |:---|:---|:---|:---|
-| **worker** | `.claude/agents/worker_agent.md` | 执行 `bin/` 脚本 | 幂等性 (5s缓存) |
-| **skills** | `.claude/agents/skills_agent.md` | 执行已安装技能 | 超时 (90s限制) |
+| **worker_agent** | `.claude/agents/worker_agent.md` | 执行 `bin/` 脚本 | 幂等性 (5s缓存) |
+| **skills_agent** | `.claude/agents/skills_agent.md` | 执行已安装技能 | 超时 (90s限制) |

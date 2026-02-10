@@ -1138,7 +1138,9 @@ class GitHubHandler:
                 info(f"已过滤: {len(skill_dirs)} -> {len(filtered)} 个技能")
                 skill_dirs = filtered
             else:
-                warn(f"未找到匹配的技能: {skill_name}，返回全部技能")
+                error(f"未找到匹配的技能: {skill_name}")
+                error(f"可用技能: {', '.join([s.name for s in skill_dirs[:5]])}{'...' if len(skill_dirs) > 5 else ''}")
+                return []  # 返回空列表，不返回全部技能
 
         return skill_dirs
 

@@ -71,7 +71,6 @@
 - **卸载**: `skill_manager.py uninstall <name> [...]` → `worker_agent` → 支持批量
 - **搜索**: `skill_manager.py search <kw>` → `worker_agent` → 精确/语义匹配
 - **列表**: `skill_manager.py list` → `worker_agent` → 查看已装技能
-- **验证**: `skill_manager.py verify-config [--fix]` → `worker_agent` → 验证配置
 - **使用**: `@技能名` → `skills_agent` → 使用 Skill 工具调用
 
 ### 2.6 能力展示规则: 

@@ -8,6 +8,7 @@
 1. 无授权不产生额外作用 (No Side-Effect)。
 2. 极简输出 (仅保留数据与状态，拒绝废话)。
 3. 多步任务串行派发，禁止并行；
+4. 回复语言与用户使用语言一致；
 **禁止输出重定向到nul** 
 - Windows下禁用 `> nul`/`> /dev/null`，避免创建物理nul文件导致文件系统错误。如需静默执行，忽略输出即可。
 **关键文件**:
@@ -23,10 +24,10 @@
 
 ## 2. 逻辑引擎 (执行流)
 
-### 2.1 首次对话入口强制执行 [P0]
-- 路由至 `worker_agent` 执行 `python bin/skill_manager.py list` ，任务串行，禁止并行
-- 路由至 `worker_agent` 执行 `python bin/updater.py`，任务串行，禁止并行。仅检测版本，不要引导更新
-- 若技能数 < 10 → 提醒用户"提供 GitHub skills项目网址即可安装新技能
+### 2.1 仅在主会话首次对话入口强制执行3步 [P0]
+1. 路由至 `worker_agent` 执行 `python bin/skill_manager.py list` ，任务串行，禁止并行
+2. 路由至 `worker_agent` 执行 `python bin/updater.py`，任务串行，禁止并行。仅检测版本，不要引导更新
+3. 若技能数 < 10 → 提醒用户"提供 GitHub skills项目网址即可安装新技能
 
 ### 2.2 感知与意图
 **路由优先级** (高优先级阻断低优先级):

@@ -29,10 +29,18 @@ import gc
 def _patch_yara_scanner() -> bool:
     """
     修复 yara-python 在 Windows 上的 filepaths 编译问题
+
+    注意：这是 Monkey Patching，如果 cisco-ai-skill-scanner 更新内部实现，
+    补丁可能会失效。建议定期检查补丁兼容性。
+
+    长期方案：向上游提交 PR 修复 Windows 兼容性问题。
     """
     try:
         from skill_scanner.core.rules import yara_scanner
         import yara
+
+        # 版本检查：确保补丁与库版本兼容（可选）
+        # 如果需要特定版本，可以在这里添加检查
 
         original_load = yara_scanner.YaraScanner._load_rules
 
@@ -60,8 +68,17 @@ def _patch_yara_scanner() -> bool:
         return False
 
 
-# 应用补丁
-_patch_yara_scanner()
+# 补丁应用状态标志（懒加载）
+_patches_applied = False
+
+
+def _ensure_patches_applied() -> None:
+    """确保补丁已应用（懒加载，仅在首次需要时执行）"""
+    global _patches_applied
+    if not _patches_applied:
+        _patch_yara_scanner()
+        _patch_skill_loader()
+        _patches_applied = True
 
 
 # =============================================================================
@@ -74,6 +91,11 @@ def _patch_skill_loader() -> bool:
 
     问题：YAML 格式错误（如 key:value）导致整个扫描失败
     解决：容错解析，失败时使用降级方案继续扫描代码
+
+    注意：这是 Monkey Patching，如果 cisco-ai-skill-scanner 更新内部实现，
+    补丁可能会失效。建议定期检查补丁兼容性。
+
+    长期方案：向上游提交 PR 改进 frontmatter 容错性。
     """
     try:
         import re
@@ -221,10 +243,6 @@ def _patch_skill_loader() -> bool:
         return False
 
 
-# 应用 frontmatter 容错补丁
-_patch_skill_loader()
-
-
 # =============================================================================
 # 路径配置
 # =============================================================================
@@ -281,6 +299,9 @@ def scan(skill_path: Path, config: Optional[Dict] = None) -> Dict[str, Any]:
     Returns:
         扫描结果字典
     """
+    # 确保补丁已应用（懒加载）
+    _ensure_patches_applied()
+
     try:
         from skill_scanner import SkillScanner
         from skill_scanner.core.analyzers import StaticAnalyzer, BehavioralAnalyzer

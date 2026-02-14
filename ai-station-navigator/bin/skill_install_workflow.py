@@ -105,15 +105,22 @@ def extract_skill_name_from_url(url: str) -> Optional[str]:
     return None
 
 
-def run_subprocess(cmd: List[str], cwd: Optional[Path] = None) -> subprocess.CompletedProcess:
-    """运行子进程命令"""
+def run_subprocess(cmd: List[str], cwd: Optional[Path] = None, timeout: int = 300) -> subprocess.CompletedProcess:
+    """运行子进程命令
+
+    Args:
+        cmd: 命令列表
+        cwd: 工作目录
+        timeout: 超时时间（秒），默认 5 分钟
+    """
     return subprocess.run(
         cmd,
         capture_output=True,
         text=True,
         encoding="utf-8",
         errors="replace",
-        cwd=cwd
+        cwd=cwd,
+        timeout=timeout
     )
 
 
@@ -166,10 +173,11 @@ def clone_repo_node(state: InstallWorkflowState) -> Dict:
     """
     克隆 GitHub 仓库并提取技能目录
 
-    调用: python bin/clone_manager.py clone <url> [--skill <name>]
+    调用: python bin/clone_manager.py clone <url>
+    过滤: 在 workflow 层根据 state["skill_name"] 过滤（架构一致性）
 
     自动从 URL 子路径提取技能名:
-    - https://github.com/user/repo/tree/main/skills/anndata → --skill anndata
+    - https://github.com/user/repo/tree/main/skills/anndata → skill_name="anndata"
     """
     url = state["github_url"]
     skill_name = state.get("skill_name")
@@ -183,8 +191,7 @@ def clone_repo_node(state: InstallWorkflowState) -> Dict:
     force = state.get("force_install", False)
 
     cmd = [sys.executable, str(SCRIPT_DIR / "clone_manager.py"), "clone", url]
-    if skill_name:
-        cmd.extend(["--skill", skill_name])
+    # 不再传递 --skill 参数，在 workflow 层过滤以保持架构一致性
     if force:
         cmd.append("--force")
 
@@ -204,6 +211,25 @@ def clone_repo_node(state: InstallWorkflowState) -> Dict:
         logs.append(f"[DEBUG] 输出: {result.stdout}")
     else:
         logs.append(f"[OK] 克隆成功，发现 {len(skill_dirs)} 个技能")
+
+        # 在 workflow 层根据 skill_name 过滤（架构统一性：参数通过 LangGraph state 传递）
+        if skill_name:
+            normalized_target = skill_name.lower().replace('_', '-')
+            filtered = []
+            for skill_dir in skill_dirs:
+                dir_name = Path(skill_dir).name
+                # 支持直接匹配和 _/- 变体匹配
+                if (dir_name.lower() == skill_name.lower() or
+                    dir_name.lower().replace('_', '-') == normalized_target or
+                    dir_name.lower().replace('-', '_') == normalized_target):
+                    filtered.append(skill_dir)
+                    logs.append(f"[FILTER] 匹配技能: {dir_name}")
+
+            if filtered:
+                logs.append(f"[FILTER] 应用 skill_name 过滤: {len(skill_dirs)} -> {len(filtered)} 个技能")
+                skill_dirs = filtered
+            else:
+                logs.append(f"[WARN] 未找到匹配 '{skill_name}' 的技能，返回所有 {len(skill_dirs)} 个技能")
 
     return {
         "cloned_repo_path": url,
@@ -305,7 +331,7 @@ def parse_scan_output(output: str, skill_name: str) -> Dict:
     return result
 
 
-def extract_code_snippet(file_path: str, line_number: int, context_lines: int = 2) -> str:
+def extract_code_snippet(file_path: str, line_number: int, context_lines: int = 2, allowed_base: Optional[Path] = None) -> str:
     """
     提取指定代码行的上下文片段
 
@@ -317,6 +343,15 @@ def extract_code_snippet(file_path: str, line_number: int, context_lines: int = 
     Returns:
         代码片段字符串，失败时返回错误信息
     """
+    # 路径验证：确保 file_path 在允许的范围内
+    abs_path = Path(file_path).resolve()
+    if allowed_base is not None:
+        allowed_abs = allowed_base.resolve()
+        try:
+            abs_path.relative_to(allowed_abs)
+        except ValueError:
+            return f"[路径验证失败: {file_path} 不在允许的目录 {allowed_base} 内]"
+
     try:
         with open(file_path, encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
@@ -649,9 +684,9 @@ def llm_analysis_review_node(state: InstallWorkflowState) -> Dict:
             "logs": logs
         }
 
-    except ImportError:
-        # interrupt 不可用，降级为手动模式
-        logs.append(f"[ERROR] interrupt() 不可用，请安装 langgraph")
+    except ImportError as e:
+        # interrupt 不可用，抛出特定异常让主流程处理
+        logs.append(f"[ERROR] interrupt() 不可用: {e}")
         logs.append(f"[INFO] 分析提示词: {prompt_file}")
 
         # 保存手动恢复请求
@@ -672,9 +707,8 @@ def llm_analysis_review_node(state: InstallWorkflowState) -> Dict:
         print(f"\n恢复命令已保存: {request_file}")
         print("=" * 60)
 
-        # 退出（需要手动恢复）
-        import sys
-        sys.exit(0)
+        # 抛出特定异常而非直接退出，让主流程决定如何处理
+        raise RuntimeError("LangGraph interrupt() 不可用，请确保已正确安装 langgraph 包")
 
 
 def install_skills_node(state: InstallWorkflowState) -> Dict:

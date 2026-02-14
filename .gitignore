@@ -41,3 +41,6 @@ nul
 # Generated update script
 **/bin/update_skills_mapping.py
 
+# Generated skills mapping
+docs/skills-mapping.md
+

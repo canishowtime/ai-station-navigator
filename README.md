@@ -61,7 +61,7 @@ The project references computer organization principles to transform AI capabili
 ---
 
 <div align="center">
-  <img src="demo.gif" width="600" alt="演示动图" />
+  <img src="demo.gif" width="800" alt="演示动图" />
 </div>
 
 ---

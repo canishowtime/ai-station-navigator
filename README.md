@@ -34,7 +34,7 @@ The project references computer organization principles to transform AI capabili
 
 ### 🏗️ Architecture Analogy
 
-| Physical Component | Software Mapping | Role & Function Description |
+| Computer | AI Station | Role & Function Description |
 | --- | --- | --- |
 | **CPU** | **LLM** | **Computing Power**: Responsible for driving capabilities. |
 | **System Kernel** | **Claude Code + CLAUDE.md** | **Core Logic Layer**: Responsible for intent recognition, instruction scheduling, task decomposition, and context management. |

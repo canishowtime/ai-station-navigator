@@ -8,7 +8,7 @@
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)](https://microsoft.com)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-0078D6?logo=windows&logoColor=white)](https://microsoft.com)
 [![Release](https://img.shields.io/github/v/release/YOUR_USERNAME/YOUR_REPO_NAME?label=Release&color=blue)](https://github.com/canishowtime/ai-station-navigator/releases)
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B_(Portable)-3776AB?logo=python&logoColor=white)](https://python.org)
@@ -41,7 +41,7 @@ The project references computer organization principles to transform AI capabili
 | **System Processes** | **Sub-Agents (worker/skills)** | **Execution Layer**: Sub-agents isolate the running of single applications or scripts, **reducing context pollution for the main agent**. |
 | **Applications (Apps)** | **Skills (GitHub Repos)** | **Function Plugin Layer**: Implements "App Store-style" one-click installation and invocation via GitHub links. |
 | **System Drivers** | **MCP + Hooks** | **Extension & Automation**: MCP provides external system extensions; Hooks drive system automation (logs/space/status). |
-| **Monitor** | **Windows Terminal** | **Information Output**: Provides status display and information output. |
+| **Monitor** | **Windows Terminal / macOS Terminal** | **Information Output**: Provides status display and information output. |
 | **Runtime Environment** | **Portable Environment** | **Underlying Support**: Integrated portable versions of Python, Node.js, and Git. Ensures a highly unified environment and enhances potential scalability. |
 
 ---
@@ -94,8 +94,32 @@ ai-station-navigator/
 
 Download the **[All-in-One Package](https://github.com/canishowtime/ai-station-navigator/releases)** to achieve zero-configuration operation:
 
+#### Windows Users
 1. **Launch**: Double-click `Start ai-station-navigator.bat` in the root directory.
 2. **Ready**: Follow the on-screen prompts to install missing components and input your self-prepared `LLM-API-KEY` to enter the startup state.
+
+#### macOS Users
+
+**Installation Steps:**
+
+1. After extracting the downloaded zip file (double-click to extract), open the built-in "Terminal" application and navigate to the extracted directory:
+   ```bash
+   cd ~/Downloads/AI-Station-navigator
+   ```
+
+2. Run the installation script:
+   ```bash
+   bash unpack.sh
+   ```
+
+**Launching the Application:**
+
+After installation, for first-time use, **right-click 'start.command' and select 'Open'**; subsequent runs can be done by double-clicking 'start.command'.
+
+**Notes:**
+
+- A new terminal window will open with a custom theme applied on first launch
+- If prompted about security during launch, right-click 'start.command' and select 'Open'
 
 ### 2. Intelligent Management (Chat as Command)
 
@@ -136,7 +160,7 @@ Here are some GitHub projects collected for testing: [View Skills Categories](sk
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)](https://microsoft.com)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-0078D6?logo=windows&logoColor=white)](https://microsoft.com)
 [![Release](https://img.shields.io/github/v/release/YOUR_USERNAME/YOUR_REPO_NAME?label=Release&color=blue)](https://github.com/canishowtime/ai-station-navigator/releases)
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B_(Portable)-3776AB?logo=python&logoColor=white)](https://python.org)
@@ -216,8 +240,32 @@ ai-station-navigator/
 
 下载**[整合包](https://github.com/canishowtime/ai-station-navigator/releases) **后，即可实现零配置运行：
 
+#### Windows 用户
 1. **启动**：双击根目录下的 `启动 ai-station-navigator.bat`。
 2. **就绪**：按照屏幕提示安装缺失组件并输入自行准备的 `LLM-API-KEY`，即可进入启动状态。
+
+#### macOS 用户
+
+**安装步骤：**
+
+1. 解压下载的 zip 文件（双击即可解压）后，打开系统自带"终端"应用，进入解压后的目录：
+   ```bash
+   cd ~/Downloads/AI-Station-navigator
+   ```
+
+2. 执行安装脚本：
+   ```bash
+   bash unpack.sh
+   ```
+
+**启动应用：**
+
+安装完成后，首次使用需 **右键'启动.command'——> 选'打开'**；下次运行时可通过双击'启动.command'。
+
+**注意事项：**
+
+- 首次启动时会打开新终端窗口并应用自定义主题
+- 如果启动时提示无法确认安全性，请右键点击'启动.command'选择'打开'
 
 ### 2. 智能化管理 (对话即指令)
 

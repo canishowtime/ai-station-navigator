@@ -1,2 +1,16 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+git/** linguist-vendored
+bin/git/** linguist-vendored
+
+# 2. 排除所有 Perl 相关文件（如果你的项目中完全不包含自己写的 Perl 代码）
+*.pl                     linguist-vendored
+*.pm                     linguist-vendored
+*.pod                    linguist-vendored
+
+# 3. 处理你提到的 HTML 和文档
+*.html                   linguist-vendored
+*.htm                    linguist-vendored
+*.txt                    linguist-documentation
+
+# 4. 强化 .bat 文件的权重
+*.bat                    linguist-language=Batchfile
+*.bat                    linguist-detectable=true

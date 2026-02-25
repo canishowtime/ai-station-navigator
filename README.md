@@ -120,6 +120,7 @@ After installation, for first-time use, **right-click 'start.command' and select
 
 - A new terminal window will open with a custom theme applied on first launch
 - If prompted about security during launch, right-click 'start.command' and select 'Open'
+- If the system prompts you to install Git during first run, please follow the system instructions to complete the installation (typically requires installing Xcode Command Line Tools)
 
 ### 2. Intelligent Management (Chat as Command)
 
@@ -266,6 +267,7 @@ ai-station-navigator/
 
 - 首次启动时会打开新终端窗口并应用自定义主题
 - 如果启动时提示无法确认安全性，请右键点击'启动.command'选择'打开'
+- 首次运行时如果系统提示需要安装 Git，请按照系统提示完成安装（通常需要安装 Xcode 命令行工具）
 
 ### 2. 智能化管理 (对话即指令)
 

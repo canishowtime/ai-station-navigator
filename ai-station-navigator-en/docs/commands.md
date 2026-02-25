@@ -1,0 +1,93 @@
+# Vector Registry (Operator Registry)
+
+**Context**: Level 2 Registry
+**Parent**: `CLAUDE.md`
+**Doc Base**: `docs/guides/` (if parameters unclear, check corresponding guide)
+
+## 1. Skill Domain (Skill & Scan)
+**Base**: `python bin/`
+
+⚠️ **Kernel direct call prohibited** → must dispatch via `worker_agent` (CLAUDE.md:232)
+
+| Intent | Command Signature | Note |
+|:---|:---|:---|
+| **Install** | `skill_install_workflow.py <url> [--skill <name>] [--force]` | **Recommended**: Complete workflow (clone→scan→LLM→install) |
+| **Install** | `skill_manager.py install <src>` | Quick install (local/package), no scan |
+| **Uninstall** | `skill_manager.py uninstall <name> [...]` | **Sync DB Auto, batch supported** |
+| **List** | `skill_manager.py list` | View installed skills |
+| **Search** | `skill_manager.py search <kw>` | See CLAUDE.md protocol |
+| **Register Skills** | `register_missing_skills.py [--dry-run]` | Scan and register missing skills to database |
+| **Verify Config** | `skill_manager.py verify-config [--fix]` | Verify config files |
+| **Scan** | `security_scanner.py scan <target>` | Scan single skill |
+| **Scan All** | `security_scanner.py scan-all` | Scan all installed skills |
+| **Scan Config** | `security_scanner.py config` | View security scan config |
+
+### 1.1 Repository Management (Repo)
+**Base**: `python bin/clone_manager.py`
+
+| Intent | Command Signature | Note |
+|:---|:---|:---|
+| **Clone** | `clone <url> [--ref <branch>] [--depth <n>]` | Clone GitHub repository |
+| **List Cache** | `list-cache` | List repository cache |
+| **Clear Cache** | `clear-cache [--older-than <days>] [--all]` | Clean repository cache |
+
+## 2. MCP Resources (MCP Server)
+**Base**: `python bin/mcp_manager.py`
+
+- **List**: `list`
+- **Add**: `add <name> [--env K=V] [-i]`
+- **Rm**: `remove <name>`
+- **Test**: `test <name>`
+- **Presets**: `context7`, `tavily`, `filesystem`, `github`, `sqlite`, `memory`
+
+## 4. File Editor
+**Base**: `python bin/hooks_manager.py`
+
+- **Execute**: `execute [--hook-type <type>] [--force]`
+- **Trigger**: `trigger --hook-name <name>`
+- **List**: `list`
+- **Enable**: `enable --hook-name <name>`
+- **Disable**: `disable --hook-name <name>`
+
+**Auto Hooks** (System auto-triggered):
+- `log_rotate` (Session Start)
+- `check_disk_space` (Session Start)
+- `cleanup_workspace` (Delivery)
+- `refresh_skills_on_start` (Session Start)
+- `security_scan_on_install` (Post-Install) - Auto scan skill security
+- `cleanup_old_downloads` (Session Start)
+- `create_delivery_snapshot` (Delivery)
+
+## 5. Filesystem Permissions (FS Map)
+**Base**: `python bin/file_editor.py`
+
+- **Replace**: `replace <file> <old> <new>`
+- **Regex**: `regex <file> <pattern> <replacement> [count=0]`
+- **Append**: `append <file> <content>`
+- **Prepend**: `prepend <file> <content>`
+- **Insert After**: `insert-after <file> <marker> <content>`
+- **Insert Before**: `insert-before <file> <marker> <content>`
+- **Delete Between**: `delete-between <file> <start_marker> <end_marker>`
+- **Update JSON**: `update-json <file> <field_path> <value>`
+
+## 6. External Access Protocol (Ext. Access)
+
+| Zone | Path | Permission | Role |
+|:---|:---|:---|:---|
+| **Core** | `bin/` | 🔒 **Read-Only** | Execute only, modification prohibited |
+| **Memory** | `.claude/` | 🟡 **Kernel R/W** | State persistence |
+| **Work** | `mybox/` | ⚡ **Free R/W** | Only sandbox environment |
+| **Output** | `delivery/` | 🟢 **Write-Once** | Final deliverables |
+
+## 7. Version Info (Version)
+
+### GitHub Protocol
+⚠️ **STRICT RULE**: Direct `git clone` or `curl` prohibited. Must go through accelerator/parser.
+
+| Action | Tool Command |
+|:---|:---|
+| **DB Import** | `python bin/skills_db_sync.py --import <json>` |
+| **Get File** | `python bin/gh_fetch.py raw <user/repo/branch/path>` |
+
+**Last Updated**: 2026-02-04
+**Ver**: v6.0 (Remove: improvement_manager; Add: skill_install_workflow, clone_manager)

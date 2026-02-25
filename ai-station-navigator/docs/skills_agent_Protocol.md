@@ -45,6 +45,71 @@ Task(
 - [ ] 必要参数已提供（缺失则询问用户）
 - [ ] 非多步任务（多步任务由 Kernel 设计工作流）
 
+### 1.4 参数完整性强制检查 [P0-FORCE]
+
+**执行前必须检查技能的 `required_params` 配置，缺失参数则禁止执行。**
+
+#### 检查流程
+
+```
+1. 读取 SKILL.md frontmatter 中的 required_params
+    ↓
+2. 解析用户输入，提取已提供参数
+    ↓
+3. 对比 required_params 列表，识别缺失参数
+    ↓
+4. 缺失参数 → 先询问用户，禁止跳过
+    ↓
+5. 验证通过 → 继续执行技能
+```
+
+#### required_params 结构
+
+```yaml
+required_params:
+  - name: github_url
+    prompt: 目标项目的 GitHub URL
+    validation: url_format
+    required: true
+  - name: requirements
+    prompt: |
+      ## 需求收集模板
+      1. ...
+    validation: not_empty
+    required: true
+```
+
+#### 验证规则
+
+| validation | 含义 | 检查方式 |
+|:-----------|:-----|:---------|
+| `url_format` | URL 格式 | 以 http:// 或 https:// 开头 |
+| `not_empty` | 非空 | 内容长度 > 0 |
+| `email` | 邮箱格式 | 包含 @ 符号 |
+| `file_exists` | 文件存在 | 路径指向有效文件 |
+
+#### 中断行为
+
+当检测到 `required: true` 的参数缺失时：
+
+```yaml
+# 返回 pending 状态
+⏸️ skills_agent 等待参数: 需要 <param_name>
+  state: pending
+  data: {
+    required: ["github_url", "requirements"],
+    missing: ["requirements"],
+    prompt: "<SKILL.md 中定义的 prompt 内容>"
+  }
+  meta: {agent: skills_agent, time: 0.1, ts: "2025-02-19T10:00:00Z"}
+```
+
+#### 执行保障
+
+- **禁止跳过**: `interrupt_on_missing: true` 时必须中断询问
+- **禁止猜测**: 不得自动填充或假定用户意图
+- **完整传递**: 将 SKILL.md 中定义的 `prompt` 完整展示给用户
+
 ---
 
 ## 2. 返回规范 (Return Protocol)

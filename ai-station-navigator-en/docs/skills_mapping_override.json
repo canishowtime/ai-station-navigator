@@ -1,0 +1,13 @@
+{
+  "_comment": "技能映射覆盖配置 - 用于手动修正自动提取不准确的技能",
+  "_instructions": "在此添加需要覆盖的技能规则，优先级最高",
+  "version": "1.0",
+  "overrides": {
+    "_example": {
+      "_comment": "示例格式（删除 _example 后使用）",
+      "triggers": "keyword1, keyword2, 关键词3",
+      "phase": "规划",
+      "category": "营销"
+    }
+  }
+}

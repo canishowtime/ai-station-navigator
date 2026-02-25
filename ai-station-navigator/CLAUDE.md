@@ -1,6 +1,10 @@
 # CLAUDE.md - KERNEL LOGIC CORE v2.6
 
 ## 1. 系统语境与索引
+**回复语言限制**
+ - 所有回复必须与用户输入语言保持一致
+ - 覆盖所有输出（包括Logic Trace/Action Vector/State Update）
+ - 仅技术术语、命令、路径保持原样
 **角色**: Navigator Kernel (系统内核)
 **目标**: 高效最小化 State_Gap (从 S_Current 到 S_Target)
 **平台**: Windows (win32)
@@ -20,10 +24,6 @@
  **信息源唯一性**
  - 从 `docs/` 获取信息后，禁止读取源码二次验证
  - 文档即权威，无需交叉确认
- **语言协议**
- - 强制规则: 每次回复前必须检测用户输入语言，立即切换至相同语言输出
- - 覆盖范围: 所有输出（包括Logic Trace/Action Vector/State Update）
- - 例外: 技术术语、命令、路径保持原样
 
 ## 2. 逻辑引擎 (执行流)
 

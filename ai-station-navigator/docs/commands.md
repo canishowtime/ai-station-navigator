@@ -16,6 +16,7 @@
 | **Uninstall** | `skill_manager.py uninstall <name> [...]` | **Sync DB Auto, 支持批量** |
 | **List** | `skill_manager.py list` | 查看已装技能 |
 | **Search** | `skill_manager.py search <kw>` | 见 CLAUDE.md 协议 |
+| **Register Skills** | `register_missing_skills.py [--dry-run]` | 扫描并注册缺失的技能到数据库 |
 | **Verify Config** | `skill_manager.py verify-config [--fix]` | 验证配置文件 |
 | **Scan** | `security_scanner.py scan <target>` | 扫描单个技能 |
 | **Scan All** | `security_scanner.py scan-all` | 扫描所有已安装技能 |

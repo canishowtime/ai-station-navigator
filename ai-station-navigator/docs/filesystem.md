@@ -37,6 +37,9 @@ project-root/
 │   │   ├── gh-fetch-guide.md                GitHub 资源获取
 │   │   └── hooks-manager-guide.md           钩子管理
 ├── tests/                   🧪 [RO]  Test Suite
+├── mazilin_workflows/       🔄 [RW]  官方工作流应用存储
+│   ├── README.md            📋 工作流总览
+│   └── *.md                 📄 各工作流文档
 ├── CLAUDE.md                📜 Core Protocol
 └── README.md                📄 Project Info
 ```
@@ -58,6 +61,7 @@ project-root/
     ├─ 临时/下载 → mybox/temp/
     ├─ 持久化缓存 → mybox/cache/
     ├─ 工作文件 → mybox/workspace/<task-name>/
+    ├─ 工作流文档 → mazilin_workflows/<workflow-name>.md
     └─ 日志 → mybox/logs/
 ```
 

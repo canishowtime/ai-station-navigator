@@ -9,7 +9,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-0078D6?logo=windows&logoColor=white)](https://microsoft.com)
-[![Release](https://img.shields.io/github/v/release/YOUR_USERNAME/YOUR_REPO_NAME?label=Release&color=blue)](https://github.com/canishowtime/ai-station-navigator/releases)
+[![Release](https://img.shields.io/github/v/release/canishowtime/ai-station-navigator?label=Release&color=blue)](https://github.com/canishowtime/ai-station-navigator/releases)
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B_(Portable)-3776AB?logo=python&logoColor=white)](https://python.org)
 [![Node.js](https://img.shields.io/badge/Node.js-Bundled-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
@@ -162,7 +162,7 @@ Here are some GitHub projects collected for testing: [View Skills Categories](sk
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-0078D6?logo=windows&logoColor=white)](https://microsoft.com)
-[![Release](https://img.shields.io/github/v/release/YOUR_USERNAME/YOUR_REPO_NAME?label=Release&color=blue)](https://github.com/canishowtime/ai-station-navigator/releases)
+[![Release](https://img.shields.io/github/v/release/canishowtime/ai-station-navigator?label=Release&color=blue)](https://github.com/canishowtime/ai-station-navigator/releases)
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B_(Portable)-3776AB?logo=python&logoColor=white)](https://python.org)
 [![Node.js](https://img.shields.io/badge/Node.js-Bundled-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)

@@ -8,6 +8,7 @@
 1. No unauthorized side effects.
 2. Minimal output (data and state only, no fluff).
 3. Multi-step tasks dispatched serially, parallel execution prohibited;
+4. Initial check must be executed at first conversation entry in main session (see 2.1)
 **Prohibit output redirection to nul**
 - On Windows, disable `> nul`/`> /dev/null` to avoid creating physical nul files that cause filesystem errors. For silent execution, simply ignore output.
 **Key Files**:
@@ -24,10 +25,13 @@
 
 ## 2. Logic Engine (Execution Flow)
 
-### 2.1 Execute 3 Steps Only at First Conversation Entry in Main Session [P0]
-1. Route to `worker_agent` to execute `python bin/skill_manager.py list`, tasks are serial, parallel execution prohibited
-2. Route to `worker_agent` to execute `python bin/updater.py`, tasks are serial, parallel execution prohibited. Only detect version, do not prompt for updates
-3. If skill count < 10 → remind user "Provide GitHub skills project URL to install new skills"
+### 2.1 Initial Check Must Be Executed at First Conversation Entry in Main Session [P0]
+1. Route to `worker_agent` to execute `python bin/init_check.py`, passthrough JSON:
+  - `deps.missing` → prompt missing dependencies
+  - `update.has_update` → prompt new version (no update guidance)
+  - `skills_count` → report skill count
+  - `need_install_reminder` → remind to install new skills
+2. Main agent summarizes returned information to user.
 
 ### 2.2 Perception & Intent
 **Routing Priority** (high priority blocks low priority):
@@ -50,7 +54,7 @@
    -  No → Match optimal workflow solution from `docs/skills-mapping.md` with multiple sub-skills (maximum 3), require user confirmation before execution, only install matched sub-skills, multi-step tasks serial, parallel execution prohibited
 3. **User Explicit Workflow Request**: Design per user requirement, require user confirmation before multi-step tasks serial, parallel execution prohibited
 
-### 2.3 Multi-step Task Execution Rules
+### 2.5 Multi-step Task Execution Rules
 1. **File Saving**: Decide whether to create files based on task volume, save location `mybox/workspace/<task-name>/`
 2. **Execution Mode**: Multi-step tasks executed serially, parallel execution prohibited
 3. **Task Interruption**: Any step fails → stop and ask user
@@ -71,16 +75,15 @@
   - Data → `.json`/`.csv`
 - After successful save, output full path in [State Update]
 
-### 2.4 Execution Reference
+### 2.6 Execution Reference
 **Operation Matrix** (non-mandatory order, call as needed):
 - **Install**: `skill_install_workflow.py <url> [--skill <name>] [--force]` → `worker_agent` → complete workflow
-- **Install**: `skill_manager.py install <src>` → `worker_agent` → quick install
 - **Uninstall**: `skill_manager.py uninstall <name> [...]` → `worker_agent` → batch supported
 - **Search**: `skill_manager.py search <kw>` → `worker_agent` → exact/semantic matching
 - **List**: `skill_manager.py list` → `worker_agent` → view installed skills
 - **Use**: `@skill_name` → preprocess per `skills_agent_Protocol` → dispatch `skills_agent` to call using Skill tool
 
-### 2.5 Capability Display Rules:
+### 2.7 Capability Display Rules:
 When user asks about capabilities, describe "what you provide gets what" in natural language, do not show commands:
 - Provide GitHub repo link/name → analyze that skill's content
 - Provide skill source/keyword → install or find corresponding skill
@@ -92,7 +95,7 @@ When user asks about capabilities, describe "what you provide gets what" in natu
 **mybox Structure**: workspace (working files), temp (temporary), cache, logs.
 **Prohibit Chaotic Directories**: Use standard directories, creating unstandardized directories like analysis/ prohibited.
 **Dependency Management**: `python -m pip install <package>` (global pip prohibited).
-**Github clone**: Clone operations must load root accelerator `config.json`
+**GitHub clone**: Clone operations must load root accelerator `config.json`
 **Documentation First**: Check `docs/` before operations. 2 consecutive failures -> stop and ask.
 **Task Execution Output Structure**:
 1. `[Logic Trace]`: Routing logic analysis.

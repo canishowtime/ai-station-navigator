@@ -1,8 +1,9 @@
 {
   "$schema": "./docs/schemas/config.schema.json",
-  "version": "0.6.5",
+  "version": "0.6.7",
 
   "git": {
+    "note": "加速器限制：1) 仅支持 git clone --depth 1 操作 2) 必须配合 ssl_verify=false 使用 3) 不支持 pull/fetch/push 等其他 git 操作 / Accelerator limits: 1) ONLY for git clone --depth 1 2) Requires ssl_verify=false 3) NO pull/fetch/push support",
     "proxies": [
       "https://gh-proxy.com/github.com/{repo}",
       "https://gitclone.com/github.com/{repo}"

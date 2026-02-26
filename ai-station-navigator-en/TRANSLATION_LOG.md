@@ -81,7 +81,7 @@
 
 | File | Changes | 
 |:---|:---:|:---|
-| `bin/updater.py` | 2 output strings | 
+| `bin/init_check.py` | 2 output strings | 
 | `bin/skill_manager.py` | 50+ output strings | 
 | `bin/skill_install_workflow.py` | 30+ output strings | 
 | `bin/security_scanner.py` | 10 output strings | 

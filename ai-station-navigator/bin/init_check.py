@@ -85,6 +85,12 @@ def get_platform_info():
 def get_site_packages_path():
     """获取 site-packages 路径（优先使用标准 Lib/site-packages）"""
     try:
+        # macOS 优先使用用户目录，避免权限问题
+        if sys.platform == 'darwin' and site.USER_SITE:
+            user_site = Path(site.USER_SITE)
+            if user_site.exists() or user_site.parent.exists():
+                return user_site
+
         site_packages = site.getsitepackages()
         if site_packages:
             # 优先返回标准的 Lib/site-packages 路径

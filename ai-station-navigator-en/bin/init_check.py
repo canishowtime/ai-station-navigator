@@ -85,6 +85,12 @@ def get_platform_info():
 def get_site_packages_path():
     """Get site-packages path (prioritize standard Lib/site-packages)"""
     try:
+        # macOS: prioritize user directory to avoid permission issues
+        if sys.platform == 'darwin' and site.USER_SITE:
+            user_site = Path(site.USER_SITE)
+            if user_site.exists() or user_site.parent.exists():
+                return user_site
+
         site_packages = site.getsitepackages()
         if site_packages:
             # Prefer returning standard Lib/site-packages path

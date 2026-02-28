@@ -6,6 +6,10 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 
+# Environment variables (contains sensitive API keys)
+.env
+.env.local
+
 # Node
 dist/
 node_modules/
@@ -43,4 +47,7 @@ nul
 
 # Generated skills mapping
 docs/skills-mapping.md
+
+# Translation log (local tracking only)
+ai-station-navigator-en/TRANSLATION_LOG.md
 

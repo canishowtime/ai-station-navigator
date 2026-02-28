@@ -19,6 +19,19 @@ Options:
 
 import argparse
 import sys
+import os
+
+# Windows UTF-8 兼容 (P0 - 所有脚本必须包含)
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except:
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+
 from pathlib import Path
 from typing import Dict, List, Set, Optional
 
@@ -67,7 +80,6 @@ class SkillsRegistry:
     def __init__(self, dry_run: bool = False):
         self.dry_run = dry_run
         self.missing_in_db: List[str] = []
-        self.missing_in_mapping: List[str] = []
         self.registered_count = 0
         self.failed_count = 0
 
@@ -111,34 +123,11 @@ class SkillsRegistry:
 
         return registered
 
-    def get_mapped_skills(self) -> Set[str]:
-        """从映射表获取已映射的技能列表"""
-        mapped = set()
-        if not MAPPING_FILE.exists():
-            return mapped
-
-        try:
-            content = MAPPING_FILE.read_text(encoding="utf-8")
-            # 从 markdown 表格中提取技能名
-            # 格式: | `skill-name` | ...
-            import re
-            matches = re.findall(r'\| `([^`]+)` \|', content)
-            mapped.update(matches)
-        except Exception as e:
-            print(f"警告: 读取映射表失败: {e}")
-
-        return mapped
-
     def compare_and_identify_missing(self, filesystem_skills: Dict[str, Path]) -> None:
-        """对比找出缺失的技能"""
+        """对比找出缺失的技能（仅检查数据库，用 folder_name 匹配）"""
         registered = self.get_registered_skills()
-        mapped = self.get_mapped_skills()
-
-        # 找出未在数据库中的技能
+        # 找出未在数据库中的技能（按 folder_name 匹配）
         self.missing_in_db = [name for name in filesystem_skills.keys() if name not in registered]
-
-        # 找出未在映射表中的技能
-        self.missing_in_mapping = [name for name in filesystem_skills.keys() if name not in mapped]
 
     def register_skills(self, skills_to_register: List[str]) -> None:
         """批量注册技能到数据库"""
@@ -197,7 +186,6 @@ class SkillsRegistry:
             f"映射表:   {MAPPING_FILE}",
             "",
             f"未在数据库中: {len(self.missing_in_db)} 个",
-            f"未在映射表中: {len(self.missing_in_mapping)} 个",
             ""
         ]
 
@@ -261,11 +249,10 @@ def main():
     print(f"  发现 {len(filesystem_skills)} 个技能目录")
     print()
 
-    # 步骤 2: 对比数据库和映射表
-    print("步骤 2: 对比数据库和映射表...")
+    # 步骤 2: 对比数据库
+    print("步骤 2: 对比数据库...")
     registry.compare_and_identify_missing(filesystem_skills)
     print(f"  未在数据库中: {len(registry.missing_in_db)} 个")
-    print(f"  未在映射表中: {len(registry.missing_in_mapping)} 个")
     print()
 
     # 步骤 3: 注册缺失的技能
@@ -274,16 +261,13 @@ def main():
         registry.register_skills(registry.missing_in_db)
         print()
 
-        # 步骤 4: 更新映射表
-        print("步骤 4: 更新映射表...")
-        if registry.update_mapping():
-            print("  ✓ 映射表已更新")
-        else:
-            print("  ✗ 映射表更新失败")
-        print()
+    # 步骤 4: 重建映射表（无论是否有新技能）
+    print("步骤 4: 重建映射表...")
+    if registry.update_mapping():
+        print("  [OK] 映射表已更新")
     else:
-        print("步骤 3: 无需注册，所有技能已在数据库中")
-        print()
+        print("  [ERROR] 映射表更新失败")
+    print()
 
     # 打印报告
     print(registry.generate_report())

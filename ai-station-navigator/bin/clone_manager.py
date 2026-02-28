@@ -19,12 +19,24 @@ Source: Refactored from skill_manager.py (Apache 2.0)
 """
 
 import argparse
-import json
+import sys
 import os
+
+# Windows UTF-8 兼容 (P0 - 所有脚本必须包含)
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except:
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+
+import json
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 import zipfile
@@ -34,6 +46,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
+import urllib.request
+import urllib.error
 import yaml
 
 # =============================================================================
@@ -571,61 +585,46 @@ class RemoteSkillAnalyzer:
         return self._try_fetch_url(raw_url)
 
     def _try_fetch_url(self, url: str) -> Optional[str]:
-        """尝试从指定 URL 获取文件"""
+        """尝试从指定 URL 获取文件（跨平台兼容）"""
         if not self._validate_url(url):
             return None
         try:
-            result = subprocess.run(
-                ["curl", "-s", "--max-time", "5", "--connect-timeout", "3", url],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                check=False
-            )
-            if result.returncode == 0 and result.stdout:
-                content = result.stdout
+            with urllib.request.urlopen(url, timeout=5) as response:
+                content = response.read().decode("utf-8", errors="replace")
                 if not content or "404: Not Found" in content or "<title>404" in content:
                     return None
                 return content
-        except Exception:
+        except (urllib.error.URLError, urllib.error.HTTPError, Exception):
             pass
         return None
 
     def _fetch_via_api(self, file_path: str) -> Optional[str]:
-        """通过 GitHub API 获取文件"""
+        """通过 GitHub API 获取文件（跨平台兼容）"""
         url = f"{self.API_BASE}/repos/{self.repo}/contents/{file_path}"
         headers = {"Accept": "application/vnd.github.v3.raw"}
         if self.token:
             headers["Authorization"] = f"token {self.token}"
 
-        cmd = ["curl", "-s", "--max-time", "3", url]
-        for k, v in headers.items():
-            cmd.extend(["-H", f"{k}: {v}"])
-
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                check=False
-            )
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=3) as response:
+                # 检查状态码（urllib会自动处理重定向，200-299表示成功）
+                if response.status == 403:
+                    return None
 
-            if result.returncode == 403:
-                return None
-
-            if result.returncode == 200 and result.stdout:
-                if result.stdout.startswith("{"):
+                content = response.read().decode("utf-8", errors="replace")
+                if content.startswith("{"):
                     try:
                         import base64
-                        data = json.loads(result.stdout)
+                        data = json.loads(content)
                         if "content" in data:
                             return base64.b64decode(data["content"]).decode("utf-8", errors="ignore")
                     except Exception:
                         pass
-                return result.stdout
+                return content
+        except (urllib.error.HTTPError, urllib.error.URLError) as e:
+            if hasattr(e, 'code') and e.code == 403:
+                return None
             return None
         except Exception:
             return None
@@ -838,15 +837,17 @@ class RepoCacheManager:
                         age_hours = (now - cached_at.timestamp()) / 3600
                         if age_hours < older_than_hours:
                             should_delete = False
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        # 日期解析失败时保守保留缓存
+                        warn(f"缓存元数据解析失败: {cache_dir.name} - {e}")
+                        should_delete = False
 
             if should_delete:
                 try:
                     shutil.rmtree(cache_dir, ignore_errors=False)
                     cleared += 1
-                except Exception:
-                    pass
+                except Exception as e:
+                    warn(f"删除缓存失败: {cache_dir.name} - {e}")
             else:
                 kept += 1
 
@@ -1028,8 +1029,11 @@ class GitHubHandler:
             extract_dir = repo_dir.parent / f"{repo_dir.name}_extracted"
             extract_ok, extracted = SkillPackHandler.extract_pack(skill_packages[0], extract_dir)
             if extract_ok:
-                skill_dirs.append(extracted)
-            return skill_dirs
+                # 解压成功，把 extracted 当作新的 repo_dir 继续检测
+                # （复用后面的多层检测逻辑：递归、多平台、回退机制）
+                repo_dir = extracted
+            else:
+                return skill_dirs
 
         # 平台优先级配置
         platform_priority = [

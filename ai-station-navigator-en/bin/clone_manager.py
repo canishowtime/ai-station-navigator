@@ -1,30 +1,42 @@
 #!/usr/bin/env python3
 """
 clone_manager.py - GitHub Repository Clone Manager
---------------------------------------------------
-Responsible for cloning skill repositories from GitHub to local staging space
+-----------------------------------------
+Responsible for cloning skill repositories from GitHub to local staging
 
 Responsibilities:
-1. GitHub repository cloning (with proxy support)
+1. GitHub repository cloning (with accelerator support)
 2. Remote repository analysis (pre-check, caching)
 3. Skill directory extraction
 4. Repository cache management
 
 Architecture:
-    skill_manager → clone_manager → security_scanner
+    skill_manager -> clone_manager -> security_scanner
                        ↓
-                  Staging Space (mybox/cache/repos/)
+                  Staging space (mybox/cache/repos/)
 
 Source: Refactored from skill_manager.py (Apache 2.0)
 """
 
 import argparse
-import json
+import sys
 import os
+
+# Windows UTF-8 compatibility (P0 - must be included in all scripts)
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except:
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+
+import json
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 import zipfile
@@ -34,6 +46,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
+import urllib.request
+import urllib.error
 import yaml
 
 # =============================================================================
@@ -44,12 +58,12 @@ BASE_DIR = Path(__file__).parent.parent
 CACHE_DIR = BASE_DIR / "mybox" / "cache" / "repos"
 TEMP_DIR = BASE_DIR / "mybox" / "temp"
 
-# Skill default value constants
+# Skill default constants
 DEFAULT_SKILL_DESC = "No description"
 DEFAULT_SKILL_CATEGORY = "utilities"
 DEFAULT_SKILL_TAGS = ["skill"]
 
-# Add project lib directory to sys.path (portable package dependencies)
+# Add project lib directory to sys.path (pre-built dependencies for portable package)
 _lib_dir = Path(__file__).parent.parent / "lib"
 if _lib_dir.exists():
     sys.path.insert(0, str(_lib_dir))
@@ -69,19 +83,19 @@ def log(level: str, message: str, emoji: str = ""):
     print(f"{timestamp} [{level}] {emoji} {message}")
 
 def success(msg: str):
-    log("SUCCESS", msg, "✅")
+    log("SUCCESS", msg, "[OK]")
 
 def info(msg: str):
-    log("INFO", msg, "🔄")
+    log("INFO", msg, "[INFO]")
 
 def warn(msg: str):
-    log("WARN", msg, "⚠️")
+    log("WARN", msg, "[WARN]")
 
 def error(msg: str):
-    log("ERROR", msg, "❌")
+    log("ERROR", msg, "[ERROR]")
 
 # =============================================================================
-# Configuration Loading (Shared)
+# Configuration Loading (shared)
 # =============================================================================
 
 _config_cache: Optional[dict] = None
@@ -89,7 +103,7 @@ _config_mtime: Optional[float] = None
 
 def load_config(use_cache: bool = True) -> dict:
     """
-    Load configuration file (with caching support)
+    Load configuration file (supports caching)
 
     Configuration file priority (in order):
     1. <BASE_DIR>/config.json (recommended, JSON format)
@@ -125,7 +139,7 @@ def load_config(use_cache: bool = True) -> dict:
         if current_mtime == _config_mtime:
             return _config_cache
 
-    # Load configuration (choose loading method based on file type)
+    # Load configuration (select loading method based on file type)
     try:
         with open(config_file, "r", encoding="utf-8") as f:
             if config_file.suffix == ".json":
@@ -145,7 +159,7 @@ def clear_config_cache() -> None:
     _config_mtime = None
 
 def get_git_proxies() -> list:
-    """Get Git proxy list"""
+    """Get Git accelerator list"""
     config = load_config()
     return config.get("git", {}).get("proxies", [
         "https://ghp.ci/{repo}",
@@ -158,7 +172,7 @@ def get_ssl_verify() -> bool:
     return config.get("git", {}).get("ssl_verify", True)
 
 def get_raw_proxies() -> list:
-    """Get Raw URL proxy list"""
+    """Get Raw URL accelerator list"""
     config = load_config()
     return config.get("raw", {}).get("proxies", [
         "https://ghp.ci/{path}",
@@ -188,7 +202,7 @@ class FormatDetector:
         if not re.match(github_pattern, url):
             return False, f"Invalid GitHub URL format: {url}"
 
-        # Check dangerous git configuration injection patterns
+        # Check for dangerous git configuration injection patterns
         dangerous_patterns = [
             '--config=', '-c=', '--upload-pack=', '--receive-pack=',
             '--exec=', '&&', '||', '|', '`', '$(', '\n', '\r', '\x00',
@@ -199,7 +213,7 @@ class FormatDetector:
             if pattern in url_lower:
                 return False, f"URL contains dangerous characters or patterns: {pattern}"
 
-        # Check URL encoding bypass attempts
+        # Check for URL encoding bypass attempts
         if '%2' in url.lower():
             return False, "URL contains suspicious encoded characters"
 
@@ -238,7 +252,7 @@ class FormatDetector:
         Detect input source type
 
         Returns:
-            (type, path/URL, subpath)
+            (type, path/url, subpath)
         """
         info(f"Detecting input source: {input_source}")
 
@@ -248,7 +262,7 @@ class FormatDetector:
             if "github.com" in parsed.netloc:
                 repo_url, subpath = FormatDetector.parse_github_subpath(input_source)
                 if subpath:
-                    info(f"Subpath detected: {subpath}")
+                    info(f"Detected subpath: {subpath}")
                 return "github", repo_url, subpath
 
         # 1.5 Check if it's GitHub shorthand (user/repo)
@@ -273,11 +287,11 @@ class FormatDetector:
             elif relative_path.is_dir():
                 return "local", str(relative_path), None
 
-        warn("Unable to recognize input source type, trying as local directory")
+        warn("Unable to recognize input source type, treating as local directory")
         return "unknown", input_source, None
 
 # =============================================================================
-# Skill Normalizer (Extract Required Parts)
+# Skill Normalizer (extract required parts)
 # =============================================================================
 
 class SkillNormalizer:
@@ -304,7 +318,7 @@ class SkillNormalizer:
         except (yaml.YAMLError, Exception):
             pass
 
-        # Fallback: manual parsing
+        # Fallback: manually parse
         result = {}
         for line in yaml_content.split('\n'):
             if ':' in line and not line.strip().startswith('#'):
@@ -328,7 +342,7 @@ class ProjectValidator:
     ]
 
 # =============================================================================
-# Skill Package Handler
+# Skill Pack Handler
 # =============================================================================
 
 class SkillPackHandler:
@@ -337,17 +351,17 @@ class SkillPackHandler:
     @staticmethod
     def extract_pack(pack_file: Path, extract_dir: Path) -> Tuple[bool, Optional[Path]]:
         """
-        Extract .skill skill package
+        Extract .skill package
 
         Returns:
-            (success, extract_directory)
+            (success, extract_dir)
         """
         try:
             with zipfile.ZipFile(pack_file, 'r') as zip_ref:
                 zip_ref.extractall(extract_dir)
             return True, extract_dir
         except Exception as e:
-            error(f"Failed to extract skill package: {e}")
+            error(f"Skill package extraction failed: {e}")
             return False, None
 
 # =============================================================================
@@ -355,7 +369,7 @@ class SkillPackHandler:
 # =============================================================================
 
 class RemoteSkillAnalyzer:
-    """Analyze remote GitHub repository skill information"""
+    """Analyze skill information from remote GitHub repository"""
 
     API_BASE = "https://api.github.com"
     RAW_BASE = "https://raw.githubusercontent.com"
@@ -391,10 +405,10 @@ class RemoteSkillAnalyzer:
             meta = RepoCacheManager.load_meta(cache_dir)
             if meta and meta.get("url") == self.github_url:
                 result["source"] = "cache"
-                info(f"Using local cache analysis: {self.repo}")
+                info(f"Using local cache for analysis: {self.repo}")
                 return self._analyze_from_cache(cache_dir, result)
 
-        # Network detection
+        # Network probing
         result["source"] = "network"
         return self._analyze_from_network(result)
 
@@ -526,7 +540,7 @@ class RemoteSkillAnalyzer:
             return False
 
     def fetch_file(self, file_path: str, prefer_api: bool = False) -> Optional[str]:
-        """Fetch file content - automatically select best method"""
+        """Get file content - automatically select best method"""
         if file_path in self._cache:
             return self._cache[file_path]
 
@@ -550,7 +564,7 @@ class RemoteSkillAnalyzer:
         return None
 
     def _fetch_via_raw(self, file_path: str) -> Optional[str]:
-        """Fetch file via Raw URL"""
+        """Get file via Raw URL"""
         path = f"{self.repo}/{self.branch}/{file_path}"
 
         if self._working_proxy:
@@ -571,61 +585,46 @@ class RemoteSkillAnalyzer:
         return self._try_fetch_url(raw_url)
 
     def _try_fetch_url(self, url: str) -> Optional[str]:
-        """Try to fetch file from specified URL"""
+        """Try fetching file from specified URL (cross-platform compatible)"""
         if not self._validate_url(url):
             return None
         try:
-            result = subprocess.run(
-                ["curl", "-s", "--max-time", "5", "--connect-timeout", "3", url],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                check=False
-            )
-            if result.returncode == 0 and result.stdout:
-                content = result.stdout
+            with urllib.request.urlopen(url, timeout=5) as response:
+                content = response.read().decode("utf-8", errors="replace")
                 if not content or "404: Not Found" in content or "<title>404" in content:
                     return None
                 return content
-        except Exception:
+        except (urllib.error.URLError, urllib.error.HTTPError, Exception):
             pass
         return None
 
     def _fetch_via_api(self, file_path: str) -> Optional[str]:
-        """Fetch file via GitHub API"""
+        """Get file via GitHub API (cross-platform compatible)"""
         url = f"{self.API_BASE}/repos/{self.repo}/contents/{file_path}"
         headers = {"Accept": "application/vnd.github.v3.raw"}
         if self.token:
             headers["Authorization"] = f"token {self.token}"
 
-        cmd = ["curl", "-s", "--max-time", "3", url]
-        for k, v in headers.items():
-            cmd.extend(["-H", f"{k}: {v}"])
-
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                check=False
-            )
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=3) as response:
+                # Check status code (urllib auto-handles redirects, 200-299 means success)
+                if response.status == 403:
+                    return None
 
-            if result.returncode == 403:
-                return None
-
-            if result.returncode == 200 and result.stdout:
-                if result.stdout.startswith("{"):
+                content = response.read().decode("utf-8", errors="replace")
+                if content.startswith("{"):
                     try:
                         import base64
-                        data = json.loads(result.stdout)
+                        data = json.loads(content)
                         if "content" in data:
                             return base64.b64decode(data["content"]).decode("utf-8", errors="ignore")
                     except Exception:
                         pass
-                return result.stdout
+                return content
+        except (urllib.error.HTTPError, urllib.error.URLError) as e:
+            if hasattr(e, 'code') and e.code == 403:
+                return None
             return None
         except Exception:
             return None
@@ -640,10 +639,10 @@ class RemoteSkillAnalyzer:
         if self.fetch_file("skills/commit/SKILL.md"):
             return True, f"Raw found skills/ directory (branch: {self.branch})"
 
-        return None, "Pre-check timeout or failed, falling back to clone"
+        return None, "Pre-check timeout or failure, downgrading to clone"
 
     def _verify_single_skill(self, skill_name: str) -> bool:
-        """Lightweight validation: only check if specified skill exists"""
+        """Lightweight verification: only check if specified skill exists"""
         normalized = skill_name.lower().replace('_', '-')
 
         patterns = [
@@ -671,7 +670,7 @@ class RemoteSkillAnalyzer:
 # =============================================================================
 
 class RepoCacheManager:
-    """Manage GitHub repository persistent cache"""
+    """Manage persistent cache of GitHub repositories"""
 
     @staticmethod
     def _sanitize_url(url: str) -> str:
@@ -682,7 +681,7 @@ class RepoCacheManager:
 
     @staticmethod
     def _get_cache_dir(github_url: str) -> Path:
-        """Get repository cache directory"""
+        """Get cache directory for repository"""
         cache_name = RepoCacheManager._sanitize_url(github_url)
         return CACHE_DIR / cache_name
 
@@ -718,10 +717,10 @@ class RepoCacheManager:
         timeout: int = 300
     ) -> Tuple[bool, Optional[Path], str]:
         """
-        Get repository (prefer from cache)
+        Get repository (prioritize cache)
 
         Returns:
-            (success, repository_path, message)
+            (success, repo_path, message)
         """
         cache_dir = RepoCacheManager._get_cache_dir(github_url)
 
@@ -732,7 +731,7 @@ class RepoCacheManager:
                 cached_time = meta.get("cached_at", "")
                 return True, cache_dir, f"Using cache (cached at {cached_time})"
 
-        # 2. Cache doesn't exist or force refresh, perform clone
+        # 2. Cache doesn't exist or force refresh, execute clone
         info(f"Cloning repository to cache: {github_url}")
 
         # If old cache exists, delete first
@@ -742,7 +741,7 @@ class RepoCacheManager:
             except:
                 pass
             if cache_dir.exists():
-                warn(f"Cache cleanup failed, using shutil force retry: {cache_dir}")
+                warn(f"Cache cleanup failed, using shutil for retry: {cache_dir}")
                 time.sleep(0.5)
                 try:
                     shutil.rmtree(cache_dir, ignore_errors=False)
@@ -753,11 +752,11 @@ class RepoCacheManager:
 
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-        # Perform clone
+        # Execute clone
         clone_ok, _ = GitHubHandler.clone_repo(github_url, cache_dir)
 
         if not clone_ok:
-            return False, None, "Repository doesn't exist or path error, please confirm:\n1. Repository URL is correct\n2. Is it a sub-skill (try using --skill parameter)\n3. Check mapping table: docs/skills-mapping.md"
+            return False, None, "Repository does not exist or path error, please confirm:\n1. Repository URL is correct\n2. Is it a sub-skill (try using --skill parameter)\n3. Check mapping table: docs/skills-mapping.md"
 
         # Save metadata
         meta = {
@@ -809,7 +808,7 @@ class RepoCacheManager:
         Clear cache
 
         Args:
-            older_than_hours: Only clear cache older than specified hours, None means clear all
+            older_than_hours: Only clear caches older than specified hours, None means clear all
 
         Returns:
             {"cleared": cleared_count, "kept": kept_count}
@@ -838,15 +837,17 @@ class RepoCacheManager:
                         age_hours = (now - cached_at.timestamp()) / 3600
                         if age_hours < older_than_hours:
                             should_delete = False
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        # Date parsing failed, conservatively keep cache
+                        warn(f"Cache metadata parsing failed: {cache_dir.name} - {e}")
+                        should_delete = False
 
             if should_delete:
                 try:
                     shutil.rmtree(cache_dir, ignore_errors=False)
                     cleared += 1
-                except Exception:
-                    pass
+                except Exception as e:
+                    warn(f"Failed to delete cache: {cache_dir.name} - {e}")
             else:
                 kept += 1
 
@@ -862,10 +863,10 @@ class GitHubHandler:
     @staticmethod
     def clone_repo(github_url: str, target_dir: Path) -> Tuple[bool, Path]:
         """
-        Clone GitHub repository (with proxy support)
+        Clone GitHub repository (with accelerator support)
 
         Returns:
-            (success, clone_directory)
+            (success, clone_dir)
         """
         info(f"Cloning repository: {github_url}")
 
@@ -883,7 +884,7 @@ class GitHubHandler:
             except:
                 pass
             if target_dir.exists():
-                warn(f"目录清理失败，使用 shutil 强制重试: {target_dir}")
+                warn(f"Directory cleanup failed, using shutil for retry: {target_dir}")
                 time.sleep(0.5)
                 shutil.rmtree(target_dir, ignore_errors=False)
 
@@ -898,7 +899,7 @@ class GitHubHandler:
         env["GIT_TERMINAL_PROMPT"] = "0"
         env["GIT_ASKPASS"] = "true"
 
-        # Fast probe for direct connection feasibility (5 second timeout)
+        # Fast direct connection probe (5 second timeout)
         can_direct_connect = False
         try:
             probe_cmd = cmd + ["ls-remote", "--heads", github_url]
@@ -915,9 +916,9 @@ class GitHubHandler:
                 can_direct_connect = True
                 info("Direct connection probe successful, prioritizing direct clone")
         except (subprocess.TimeoutExpired, Exception):
-            info("Direct connection probe failed, will use proxy")
+            info("Direct connection probe failed, will use accelerator")
 
-        # Choose clone strategy based on probe result
+        # Select clone strategy based on probe result
         if can_direct_connect:
             # Direct connection available, clone directly
             try:
@@ -937,7 +938,7 @@ class GitHubHandler:
             except Exception as e:
                 warn(f"Direct clone failed: {e}")
 
-        # Direct connection unavailable or failed, try proxies
+        # Direct connection unavailable or failed, try accelerators
         proxies = get_git_proxies()
         for proxy_template in proxies:
             repo_path = github_url.replace("https://github.com/", "").replace("http://github.com/", "")
@@ -956,17 +957,17 @@ class GitHubHandler:
                 )
 
                 if result.returncode == 0:
-                    success(f"Clone successful (using proxy): {target_dir}")
+                    success(f"Clone successful (using accelerator): {target_dir}")
                     return True, target_dir
             except subprocess.TimeoutExpired:
-                warn(f"Proxy timeout: {proxy_url}")
+                warn(f"Accelerator timeout: {proxy_url}")
                 continue
             except Exception as e:
-                warn(f"Proxy exception: {e}")
+                warn(f"Accelerator exception: {e}")
                 continue
 
         # All methods failed
-        error("Clone failed: direct connection and all proxies unavailable")
+        error("Clone failed: direct connection and all accelerators unable to connect")
         return False, target_dir
 
     @staticmethod
@@ -975,7 +976,7 @@ class GitHubHandler:
         max_depth: int = 5,
         exclude_dirs: Optional[set] = None
     ) -> List[Dict[str, Path]]:
-        """Recursively scan all subdirectories, find SKILL.md files"""
+        """Recursively scan all subdirectories for SKILL.md files"""
         if exclude_dirs is None:
             exclude_dirs = {"examples", "templates", "test", "tests", "docs", "reference", ".git", "node_modules", "__pycache__"}
 
@@ -998,7 +999,7 @@ class GitHubHandler:
                                 "path": item,
                                 "relative_path": new_rel_path
                             })
-                            info(f"Deep skill discovered: {new_rel_path}")
+                            info(f"Found deep skill: {new_rel_path}")
 
                         _scan_recursive(item, current_depth + 1, new_rel_path)
             except (PermissionError, OSError):
@@ -1016,20 +1017,23 @@ class GitHubHandler:
             skill_name: Optional, only extract specified skill name
 
         Returns:
-            Skill directory list
+            List of skill directories
         """
         skill_dirs = []
         exclude_dirs = {"examples", "templates", "test", "tests", "docs", "reference"}
 
-        # Detect .skill package files
+        # Check for .skill package files
         skill_packages = list(repo_dir.glob("*.skill"))
         if skill_packages:
-            info(f"Skill package file detected: {skill_packages[0].name}")
+            info(f"Detected skill package file: {skill_packages[0].name}")
             extract_dir = repo_dir.parent / f"{repo_dir.name}_extracted"
             extract_ok, extracted = SkillPackHandler.extract_pack(skill_packages[0], extract_dir)
             if extract_ok:
-                skill_dirs.append(extracted)
-            return skill_dirs
+                # Extraction successful, treat extracted as new repo_dir
+                # (Reuse following multi-layer detection logic: recursive, multi-platform, fallback mechanism)
+                repo_dir = extracted
+            else:
+                return skill_dirs
 
         # Platform priority configuration
         platform_priority = [
@@ -1063,7 +1067,7 @@ class GitHubHandler:
                         ]
                         MULTI_SKILL_THRESHOLD = 3
                         if len(sub_skill_dirs) >= MULTI_SKILL_THRESHOLD:
-                            info(f"Multi-skill container detected: {repo_dir.name} (contains {len(sub_skill_dirs)} sub-skills)")
+                            info(f"Detected multi-skill container: {repo_dir.name} (contains {len(sub_skill_dirs)} sub-skills)")
                             skill_dirs.extend(sub_skill_dirs)
                         else:
                             skill_dirs.append(location)
@@ -1078,7 +1082,7 @@ class GitHubHandler:
                                     sub_skill_candidates.append(item)
                                     sub_skill_count += 1
                             if sub_skill_count >= 1:
-                                info(f"Monorepo detected: skills/ directory contains {sub_skill_count} skills")
+                                info(f"Detected monorepo: skills/ directory contains {sub_skill_count} skills")
                                 skill_dirs.extend(sub_skill_candidates)
                                 continue
 
@@ -1088,7 +1092,7 @@ class GitHubHandler:
                                 if (item / "SKILL.md").exists():
                                     root_sub_skills.append(item)
                         if len(root_sub_skills) >= 2:
-                            info(f"Monorepo detected: root directory contains {len(root_sub_skills)} sub-skills")
+                            info(f"Detected monorepo: root directory contains {len(root_sub_skills)} sub-skills")
                             skill_dirs.extend(root_sub_skills)
                             continue
 
@@ -1105,7 +1109,7 @@ class GitHubHandler:
 
                 MULTI_SKILL_THRESHOLD = 3
                 if sub_skill_count >= MULTI_SKILL_THRESHOLD:
-                    info(f"Multi-skill subdirectory detected: {location.name} (contains {sub_skill_count} sub-skills)")
+                    info(f"Detected multi-skill subdirectory: {location.name} (contains {sub_skill_count} sub-skills)")
                     skill_dirs.extend(sub_skill_candidates)
                     continue
 
@@ -1117,7 +1121,7 @@ class GitHubHandler:
                         if has_skill:
                             skill_dirs.append(item)
 
-        # Fallback 1: Recursive deep scan
+        # Fallback mechanism 1: recursive depth scan
         if not skill_dirs:
             recursive_results = GitHubHandler._recursive_skill_scan(repo_dir, max_depth=5)
             if recursive_results:
@@ -1125,7 +1129,7 @@ class GitHubHandler:
                 skill_dirs = [r["path"] for r in recursive_results]
                 info(f"Recursive scan: found {len(skill_dirs)} deep sub-skills")
 
-        # Fallback 2: Single-layer subdirectory
+        # Fallback mechanism 2: single-layer subdirectories
         if not skill_dirs:
             fallback_skills = []
             for item in repo_dir.iterdir():
@@ -1154,7 +1158,7 @@ class GitHubHandler:
             else:
                 error(f"No matching skill found: {skill_name}")
                 error(f"Available skills: {', '.join([s.name for s in skill_dirs[:5]])}{'...' if len(skill_dirs) > 5 else ''}")
-                return []  # Return empty list, don't return all skills
+                return []  # Return empty list, not all skills
 
         return skill_dirs
 
@@ -1238,7 +1242,7 @@ def _process_github_source(
     else:
         clone_ok, repo_dir = GitHubHandler.clone_repo(github_url, temp_dir / "repo")
         if not clone_ok:
-            return [], "Repository doesn't exist or path error\nTip: Check docs/skills-mapping.md for correct repository path"
+            return [], "Repository does not exist or path error\nHint: Check docs/skills-mapping.md to confirm correct repository path"
         scan_dir = repo_dir
 
     # 4. Handle subpath
@@ -1251,21 +1255,21 @@ def _process_github_source(
             if subpath.exists():
                 scan_dir = subpath
             else:
-                return [], f"Subpath doesn't exist: {subpath}"
+                return [], f"Subpath does not exist: {subpath}"
 
     # 5. Extract skills (apply skill_name filter)
     skill_dirs = GitHubHandler.extract_skills(scan_dir, skill_name)
     if not skill_dirs:
         return [], f"No skills found, please confirm if repository is a skill repository"
 
-    return skill_dirs, f"Successfully retrieved {len(skill_dirs)} skills"
+    return skill_dirs, f"Successfully obtained {len(skill_dirs)} skills"
 
 # =============================================================================
-# CLI Entry Point
+# CLI Entry
 # =============================================================================
 
 def main():
-    """CLI entry point"""
+    """CLI entry"""
     parser = argparse.ArgumentParser(
         description="clone_manager.py - GitHub Repository Clone Manager",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1280,7 +1284,7 @@ Examples:
   # List caches
   python bin/clone_manager.py list-cache
 
-  # Clear caches
+  # Clear cache
   python bin/clone_manager.py clear-cache
         """
     )
@@ -1292,14 +1296,14 @@ Examples:
     clone_parser.add_argument("url", help="GitHub repository URL")
     clone_parser.add_argument("--skill", help="Specify sub-skill name")
     clone_parser.add_argument("--force", action="store_true", help="Force refresh cache")
-    clone_parser.add_argument("--no-cache", action="store_true", help="Don't use cache")
+    clone_parser.add_argument("--no-cache", action="store_true", help="Do not use cache")
 
     # list-cache command
     subparsers.add_parser("list-cache", help="List all caches")
 
     # clear-cache command
     clear_parser = subparsers.add_parser("clear-cache", help="Clear cache")
-    clear_parser.add_argument("--older-than", type=int, help="Only clear cache older than specified hours")
+    clear_parser.add_argument("--older-than", type=int, help="Only clear caches older than specified hours")
 
     args = parser.parse_args()
 
@@ -1342,7 +1346,7 @@ Examples:
         result = RepoCacheManager.clear_cache(
             older_than_hours=getattr(args, 'older_than', None)
         )
-        print(f"Cleanup complete: {result['cleared']} deleted, {result['kept']} kept")
+        print(f"Clear complete: {result['cleared']} deleted, {result['kept']} kept")
         return 0
 
     return 0

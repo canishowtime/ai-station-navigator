@@ -2,44 +2,75 @@
 
 **Context**: Level 2 Architecture
 **Parent**: `CLAUDE.md`
-**Rule**: All I/O operations strictly follow the permission bits below.
+**Rule**: All I/O operations must strictly follow these permission bits (Permission Bits).
+
+## 0. Project Root Detection
+
+### Marker Files
+Project root directory should contain the following files:
+- `CLAUDE.md` (required)
+- `docs/` (required)
+- `bin/` (required)
+- `.claude/` (required)
+
+### Detection Commands
+```bash
+# Check if current directory is project root
+test -f CLAUDE.md && echo "ROOT" || echo "NOT_ROOT"
+
+# Search upward for project root
+# Start from current directory, search upward for directory containing CLAUDE.md
+```
+
+### Directory Structure Description
+```
+<any-parent-directory>/              ← Launch location
+└── myagent/ai-station-navigator/    ← Project root (CLAUDE.md here)
+    ├── CLAUDE.md
+    ├── docs/
+    ├── bin/
+    ├── .claude/
+    └── mybox/
+```
+
+---
 
 ## 1. Topology & Permissions
 
 ```text
 project-root/
-├── bin/                     🔒 [RO]  Core Logic (modification/write prohibited)
+├── bin/                     🔒 [RO]  Core Logic (modifications/writing prohibited)
 ├── .claude/                 🟡 [Sys] System Config (manager operations only)
 │   ├── agents/              📋 Agent Definitions
 │   ├── memory/              💾 User Preferences
 │   ├── skills/              ⚙️  Active Skills
 │   └── state/               🔄 Runtime State
-├── mybox/                   ⚡ [RW]  Sandbox (only free R/W zone)
+├── mybox/                   ⚡ [RW]  Sandbox (only free R/W area)
 │   ├── workspace/           ↻  [Work] Workspace (task files)
-│   ├── temp/                ✕  [Tmp] Temp cache (auto cleanup)
+│   ├── temp/                ✕  [Tmp] Temporary cache (auto cleanup)
 │   ├── cache/               💾 Persistent cache
-│   │   └── repos/           📦 Git repo cache
+│   │   └── repos/           📦 Git repository cache
 │   └── logs/                📝 Runtime logs
 ├── docs/                    📖 [RO]  Documentation
-│   ├── commands.md          📋 Command Registry
-│   ├── filesystem.md        📁 Filesystem Specification
-│   ├── skills-quickstart.md ⚡ Skill Quick Start
-│   ├── skills-mapping.md    🗺️ Sub-skill Mapping Table
-│   ├── subagent-Protocol.md 📡 Sub-agent Communication Protocol
-│   ├── guides/              📚 Operation Guides
-│   │   ├── README.md                        Overview Index
-│   │   ├── skill-install-workflow-guide.md  Skill Install Workflow
-│   │   ├── clone-manager-guide.md           Repo Clone Management
-│   │   ├── security-scanner-guide.md        Security Scanner
-│   │   ├── skill-manager-guide.md           Skill Management
-│   │   ├── mcp-manager-guide.md             MCP Management
-│   │   ├── file-editor-guide.md             File Editor
-│   │   ├── gh-fetch-guide.md                GitHub Resource Fetch
-│   │   └── hooks-manager-guide.md           Hooks Management
+│   ├── commands.md          📋 Command registry
+│   ├── filesystem.md        📁 Filesystem specification
+│   ├── skills-quickstart.md ⚡ Skills quickstart
+│   ├── skills-mapping.md    🗺️ Sub-skill mapping table
+│   ├── subagent-Protocol.md 📡 Sub-agent communication protocol
+│   ├── guides/              📚 Operation guides
+│   │   ├── README.md                        Overview index
+│   │   ├── skill-install-workflow-guide.md  Skill installation workflow
+│   │   ├── clone-manager-guide.md           Repository clone management
+│   │   ├── security-scanner-guide.md        Security scanner
+│   │   ├── skill-manager-guide.md           Skill management
+│   │   ├── mcp-manager-guide.md             MCP management
+│   │   ├── file-editor-guide.md             File editor
+│   │   ├── gh-fetch-guide.md                GitHub resource fetching
+│   │   └── hooks-manager-guide.md           Hooks management
 ├── tests/                   🧪 [RO]  Test Suite
-├── mazilin_workflows/       🔄 [RW]  Official Workflow App Storage
-│   ├── README.md            📋 Workflow Overview
-│   └── *.md                 📄 Individual Workflow Docs
+├── mazilin_workflows/       🔄 [RW]  Official workflow storage
+│   ├── README.md            📋 Workflow overview
+│   └── *.md                 📄 Individual workflow documents
 ├── CLAUDE.md                📜 Core Protocol
 └── README.md                📄 Project Info
 ```
@@ -50,58 +81,58 @@ project-root/
 
 | Path | Purpose | Volatility | Cleanup Timing |
 |:---|:---|:---|:---|
-| `workspace/` | Working files (organized by task name) | Medium | After task completion |
-| `temp/` | Temp files (downloads/intermediate artifacts) | High | Auto/periodic cleanup |
+| `workspace/` | Work files (organized by task name) | Medium | After task completion |
+| `temp/` | Temporary files (downloads/intermediate) | High | Auto/periodic cleanup |
 | `cache/repos/` | Git repository cache | Low | Manual cleanup |
 | `logs/` | Runtime logs | Low | Auto rotation |
 
 **Path Selection Rules**:
 ```
-Write Request → File Type?
-    ├─ Temp/Download → mybox/temp/
-    ├─ Persistent Cache → mybox/cache/
-    ├─ Working Files → mybox/workspace/<task-name>/
-    ├─ Workflow Docs → mazilin_workflows/<workflow-name>.md
+Write requirement → File type?
+    ├─ Temporary/download → mybox/temp/
+    ├─ Persistent cache → mybox/cache/
+    ├─ Work files → mybox/workspace/<task-name>/
+    ├─ Workflow docs → mazilin_workflows/<workflow-name>.md
     └─ Logs → mybox/logs/
 ```
 
 ## 2. Data Pipelines
 
-### A. Skill Deploy Pipeline (Install Pipeline)
+### A. Skill Deployment Pipeline
 `External Source` -> `mybox/temp/` (Download) -> **Validate** -> `.claude/skills/` (Deploy)
 
-### B. Task Execution Pipeline (Task Pipeline)
+### B. Task Execution Pipeline
 1. **Ingest**: External files -> `mybox/temp/`
-2. **Process**: Working files -> `mybox/workspace/<task>/`
-3. **GC**: Task end -> cleanup `mybox/temp/` and `mybox/workspace/<task>/`
+2. **Process**: Work files -> `mybox/workspace/<task>/`
+3. **GC**: Task end -> Clean up `mybox/temp/` and `mybox/workspace/<task>/`
 
 ## 3. Core Constraints
 
 1.  **Default Sandboxing**:
-    - If user doesn't specify path, write operations **must** point to `mybox/workspace/`.
-    - Creating files in `project-root/` root directory prohibited.
+    - If user does not specify path, write operations **must** point to `mybox/workspace/`.
+    - Prohibit creating files in `project-root/` root directory.
 
 2.  **Volatility**:
-    - `mybox/` treated as **volatile storage** (can be cleaned anytime).
-    - Configs requiring persistence go into `.claude/`.
+    - `mybox/` is considered **volatile storage** (can be cleaned up at any time).
+    - Configuration requiring persistence should be stored in `.claude/`.
 
 3.  **Task Isolation**:
     - Each task uses independent subdirectory: `mybox/workspace/<task-name>/`
 
 ## 4. Cleanup Mechanism
 
-| Trigger | Cleanup Content |
+| Trigger Condition | Cleanup Content |
 |:---|:---|
-| Session Start | log_rotate (rotate logs) |
-| Session Start | cleanup_temp (cleanup temp files) |
-| Task Complete | cleanup_workspace (cleanup task directory) |
+| Session start | log_rotate (rotate logs) |
+| Session start | cleanup_temp (clean temporary files) |
+| Task completion | cleanup_workspace (clean task directory) |
 
 ### Manual Operations
 ```bash
 # Trigger all Hooks
 python bin/hooks_manager.py execute --force
 
-# Cleanup specific directory
+# Clean specific directories
 rm -rf mybox/temp/*
 rm -rf mybox/workspace/<task-name>/
 ```

@@ -20,8 +20,21 @@ v2.0 - 简化版
 """
 
 import json
-import subprocess
 import sys
+import os
+
+# Windows UTF-8 兼容 (P0 - 所有脚本必须包含)
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except:
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+
+import subprocess
 from datetime import datetime
 from enum import Enum
 from pathlib import Path

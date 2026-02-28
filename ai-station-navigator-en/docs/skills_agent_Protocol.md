@@ -209,3 +209,31 @@ When Skills Agent returns containing the following fields, Kernel **must** activ
 |:---|:---|:---|:---|
 | **worker_agent** | `.claude/agents/worker_agent.md` | Execute `bin/` scripts | Idempotency (5s cache) |
 | **skills_agent** | `.claude/agents/skills_agent.md` | Execute installed skills | Timeout (90s limit) |
+
+---
+
+## 6. Python Encoding Compatibility [P0]
+
+**Root Cause**: Windows Python defaults to GBK encoding, cannot output emoji, causing script crashes.
+
+**Mandatory Requirement**: All Python scripts must add UTF-8 encoding setting at the beginning:
+
+```python
+import sys
+import os
+
+# Windows UTF-8 Compatibility (P0 - All scripts must include)
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except:
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+```
+
+**Prohibit emoji**: Emoji is prohibited in output information, use ASCII instead:
+- `✅` → `[OK]` / `success:`
+- `❌` → `[ERROR]` / `failed:`
+- `⚠️` → `[WARN]` / `warning:`

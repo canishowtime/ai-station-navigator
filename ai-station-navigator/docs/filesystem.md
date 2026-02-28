@@ -4,6 +4,37 @@
 **Parent**: `CLAUDE.md`
 **Rule**: 所有 I/O 操作严格遵循以下权限位 (Permission Bits)。
 
+## 0. 项目根目录识别 (Project Root Detection)
+
+### 标志文件
+项目根目录应包含以下文件：
+- `CLAUDE.md` (必需)
+- `docs/` (必需)
+- `bin/` (必需)
+- `.claude/` (必需)
+
+### 检测命令
+```bash
+# 检测当前目录是否为项目根目录
+test -f CLAUDE.md && echo "ROOT" || echo "NOT_ROOT"
+
+# 向上查找项目根目录
+# 从当前目录开始，向上查找包含 CLAUDE.md 的目录
+```
+
+### 目录结构说明
+```
+<任意父目录>/                     ← 启动位置
+└── myagent/ai-station-navigator/  ← 项目根目录 (CLAUDE.md 在此)
+    ├── CLAUDE.md
+    ├── docs/
+    ├── bin/
+    ├── .claude/
+    └── mybox/
+```
+
+---
+
 ## 1. 拓扑与权限 (Topology & Permissions)
 
 ```text

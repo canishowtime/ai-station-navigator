@@ -12,7 +12,8 @@ tinydb~=4.8.0    # 允许 4.8.x 补丁更新，拒绝 5.x breaking changes
 pyyaml>=6.0
 
 # Security Scanner for Agent Skills (Apache 2.0)
-cisco-ai-skill-scanner>=0.1.0
+# 注意：不在 PyPI，需从 GitHub 安装
+git+https://github.com/cisco-ai-defense/skill-scanner.git#egg=cisco-ai-skill-scanner
 # 注意：该包的 LLM 依赖（google-generativeai, litellm, openai）对本项目非必需
 # 安装后可运行：pip uninstall -y google-generativeai google-genai litellm openai google-api-python-client google-auth
 # 节省约 180 MB 空间，不影响扫描功能

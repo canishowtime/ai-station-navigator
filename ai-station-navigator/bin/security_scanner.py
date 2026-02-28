@@ -16,6 +16,19 @@ Original Copyright 2026 Cisco Systems, Inc.
 """
 
 import sys
+import os
+
+# Windows UTF-8 兼容 (P0 - 所有脚本必须包含)
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except:
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+
 import json
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -23,52 +36,9 @@ from concurrent.futures import ThreadPoolExecutor
 import gc
 
 # =============================================================================
-# YARA 修复补丁 (Windows 兼容性)
+# 补丁应用状态标志（懒加载）
 # =============================================================================
 
-def _patch_yara_scanner() -> bool:
-    """
-    修复 yara-python 在 Windows 上的 filepaths 编译问题
-
-    注意：这是 Monkey Patching，如果 cisco-ai-skill-scanner 更新内部实现，
-    补丁可能会失效。建议定期检查补丁兼容性。
-
-    长期方案：向上游提交 PR 修复 Windows 兼容性问题。
-    """
-    try:
-        from skill_scanner.core.rules import yara_scanner
-        import yara
-
-        # 版本检查：确保补丁与库版本兼容（可选）
-        # 如果需要特定版本，可以在这里添加检查
-
-        original_load = yara_scanner.YaraScanner._load_rules
-
-        def patched_load_rules(self):
-            """修复后的 _load_rules 方法"""
-            if not self.rules_dir.exists():
-                raise FileNotFoundError(f"YARA rules directory not found: {self.rules_dir}")
-
-            yara_files = list(self.rules_dir.glob("*.yara"))
-            if not yara_files:
-                raise FileNotFoundError(f"No .yara files found in {self.rules_dir}")
-
-            # 修复: 从文件内容编译 (兼容 Windows)
-            rules_dict = {}
-            for yara_file in yara_files:
-                namespace = yara_file.stem
-                content = yara_file.read_text(encoding="utf-8")
-                rules_dict[namespace] = content
-
-            self.rules = yara.compile(sources=rules_dict)
-
-        yara_scanner.YaraScanner._load_rules = patched_load_rules
-        return True
-    except Exception:
-        return False
-
-
-# 补丁应用状态标志（懒加载）
 _patches_applied = False
 
 
@@ -76,7 +46,6 @@ def _ensure_patches_applied() -> None:
     """确保补丁已应用（懒加载，仅在首次需要时执行）"""
     global _patches_applied
     if not _patches_applied:
-        _patch_yara_scanner()
         _patch_skill_loader()
         _patches_applied = True
 
@@ -173,8 +142,13 @@ def _patch_skill_loader() -> bool:
 
             return metadata
 
-        def patched_parse_skill_md(self, skill_md_path):
-            """容错解析 SKILL.md"""
+        def patched_parse_skill_md(self, skill_md_path, *, lenient: bool = False):
+            """容错解析 SKILL.md
+
+            Args:
+                skill_md_path: SKILL.md 文件路径
+                lenient: 宽松模式标志（2.0 新增，补丁中忽略）
+            """
             try:
                 with open(skill_md_path, encoding="utf-8") as f:
                     content = f.read()
@@ -268,16 +242,16 @@ def log(level: str, message: str, emoji: str = ""):
     print(f"{timestamp} [{level}] {emoji} {message}")
 
 def success(msg: str):
-    log("SUCCESS", msg, "✅")
+    log("SUCCESS", msg, "[OK]")
 
 def info(msg: str):
-    log("INFO", msg, "🔄")
+    log("INFO", msg, "[INFO]")
 
 def warn(msg: str):
-    log("WARN", msg, "⚠️")
+    log("WARN", msg, "[WARN]")
 
 def error(msg: str):
-    log("ERROR", msg, "❌")
+    log("ERROR", msg, "[ERROR]")
 
 
 # =============================================================================
@@ -368,9 +342,31 @@ def scan(skill_path: Path, config: Optional[Dict] = None) -> Dict[str, Any]:
                     warn(f"分析器 {analyzer.get_name()} 执行失败: {e}")
             scan_duration = time.time() - start_time
 
-        # 提取威胁信息
-        threats = [
-            {
+        # 提取威胁信息（包含上下文）
+        def extract_context(file_path: Path, line_number: int, window: int = 3) -> List[str]:
+            """提取威胁代码的上下文"""
+            try:
+                if not file_path.exists():
+                    return [f"[File not found: {file_path}]"]
+
+                with open(file_path, 'r', encoding='utf-8', errors='replace') as fp:
+                    lines = fp.readlines()
+
+                context_lines = []
+                start = max(0, line_number - window - 1)
+                end = min(len(lines), line_number + window)
+
+                for i in range(start, end):
+                    prefix = ">>> " if i == line_number - 1 else "    "
+                    context_lines.append(f"{prefix}{i+1:4d} | {lines[i].rstrip()}")
+
+                return context_lines
+            except Exception:
+                return [f"[Failed to read context: {file_path}:{line_number}]"]
+
+        threats = []
+        for f in all_findings:
+            threat_data = {
                 "rule_id": f.rule_id,
                 "severity": f.severity.value,
                 "title": f.title,
@@ -378,8 +374,12 @@ def scan(skill_path: Path, config: Optional[Dict] = None) -> Dict[str, Any]:
                 "line": f.line_number,
                 "snippet": f.snippet
             }
-            for f in all_findings
-        ]
+
+            # 添加完整上下文（仅当文件路径存在时）
+            if f.file_path and f.line_number:
+                threat_data["context"] = extract_context(f.file_path, f.line_number)
+
+            threats.append(threat_data)
 
         return {
             "status": "threat_found" if all_findings else "success",
@@ -425,7 +425,7 @@ def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None) -> Dict[st
     # 单个技能：直接扫描
     if len(skill_dirs) == 1:
         skill_dir = skill_dirs[0]
-        info(f"🔄 安全扫描: {skill_dir.name}")
+        info(f"[SCAN] 安全扫描: {skill_dir.name}")
         try:
             scan_results[skill_dir.name] = scan(skill_dir, config)
         except Exception as e:
@@ -439,7 +439,7 @@ def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None) -> Dict[st
         return scan_results
 
     # 批量技能：线程池并行扫描
-    info(f"🔄 批量并行扫描 {len(skill_dirs)} 个技能 (4线程)...")
+    info(f"[SCAN] 批量并行扫描 {len(skill_dirs)} 个技能 (4线程)...")
 
     batch_size = 8
     for i in range(0, len(skill_dirs), batch_size):
@@ -580,6 +580,9 @@ Note: 克隆功能已移至 clone_manager.py
         print(f"\n状态: {result['status']}")
         print(f"严重级别: {result['severity']}")
         print(f"发现威胁: {result['findings_count']}")
+
+        if result.get("error"):
+            print(f"\n错误信息: {result['error']}")
 
         if result.get("threats"):
             print("\n威胁详情:")

@@ -18,7 +18,6 @@ restricted-tools: [Read]
 - 注册表: `docs/commands.md` (工具调用需严格遵循)
 - 文件系统/熵: `docs/filesystem.md`(查找文件前需先参考)
 - 子技能映射: `docs/skills-mapping.md` (子技能 → 主仓库映射)
-- 安装技能脚本: `bin/skill_install_workflow.py` (通用场景下技能安装方式)
 - worker_agent通信协议: `docs/worker_agent_Protocol.md` (必读，含 interrupt 补漏机制)
 - skills_agent通信协议: `docs/skills_agent_Protocol.md` (与skills_agent通信前务必使用协议)
  **信息源唯一性**
@@ -92,6 +91,28 @@ description: 提供139种营销策略建议
    ```bash
    python bin/skill_manager.py record <skill_name>
    ```
+
+### 3.3 Python 路径处理 [P0]
+
+**问题根源**: 系统PATH中的Python可能指向外部目录，导致路径混乱。
+
+**强制执行规则**:
+- **bin脚本执行**: 使用 `python bin/xxx.py` (相对路径优先)
+- **禁止硬编码绝对路径**: 不使用 `F:\...\bin\python.exe` 或 `/f/.../bin/python`
+- **跨平台兼容**: 优先 `python`，失败则尝试 `python3`
+- **Git Bash路径**: 使用 `/f/...` 格式，不用 `F:\...`
+- **便携版检测**: 仅在确认 `bin/python/python.exe` 存在时使用
+
+**正确示例**:
+```yaml
+# ✅ 正确 - 记录技能使用时
+python bin/skill_manager.py record markdown-converter
+
+# ❌ 错误
+bin/python/python.exe bin/skill_manager.py record markdown-converter
+```
+
+---
 
 #### 路径 B1: 提示词技能 (Type B)
 1. 提取 `name`、`description` 及完整内容

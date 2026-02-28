@@ -1,8 +1,8 @@
-# Skill Mapping Table
+# 技能映射表
 
-> Auto-extracted from installed skills
+> 自动从已安装技能提取
 
-| name | description | upstream_repo | subpath |
+| name | 描述 | upstream_repo | subpath |
 |:---|:---|:---|:---|
 | `ab-test-setup` | When the user wants to plan, design, or implement an A/B test or experiment  Related: page-cro: For generating test ideas based on CRO principles. analytics-tracking: For setting up test measurement. | [coreyhaines31/marketingskills](https://github.com/coreyhaines31/marketingskills) | ab-test-setup |
 | `baoyu-infographic` | Generates professional infographics with 20 layout types and 17 visual styles | [JimLiu/baoyu-skills](https://github.com/JimLiu/baoyu-skills) | baoyu-infographic |
@@ -20,7 +20,7 @@
 | `email-sequence` | When the user wants to create or optimize an email sequence, drip campaign, automated email flow, or lifecycle email program  Related: onboarding-cro: For in-app onboarding (email supports this). copywriting: For landing pages emails link to. | [coreyhaines31/marketingskills](https://github.com/coreyhaines31/marketingskills) | email-sequence |
 | `form-cro` | When the user wants to optimize any form that is NOT signup/registration — including lead capture forms, contact forms, demo request forms, application forms,...  Related: signup-flow-cro: For account creation forms. popup-cro: For forms inside popu... | [coreyhaines31/marketingskills](https://github.com/coreyhaines31/marketingskills) | form-cro |
 | `free-tool-strategy` | When the user wants to plan, evaluate, or build a free tool for marketing purposes — lead generation, SEO value, or brand awareness  Related: page-cro: For optimizing the tool's landing page. seo-audit: For SEO-optimizing the tool. | [coreyhaines31/marketingskills](https://github.com/coreyhaines31/marketingskills) | free-tool-strategy |
-| `humanizer-zh` | Remove AI-generated traces from text | [op7418/Humanizer-zh](https://github.com/op7418/Humanizer-zh) | humanizer-zh |
+| `humanizer-zh` | 去除文本中的 AI 生成痕迹 | [op7418/Humanizer-zh](https://github.com/op7418/Humanizer-zh) | humanizer-zh |
 | `invoice-organizer` | Automatically organizes invoices and receipts for tax preparation by reading messy files, extracting key information, renaming them consistently, and sorting...  Use cases: Archiving financial records by year or category. | [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills) | invoice-organizer |
 | `launch-strategy` | When the user wants to plan a product launch, feature announcement, or release strategy  Related: marketing-ideas: For additional launch tactics (#22 Product Hunt, #23 Early Access Referrals). email-sequence: For launch and onboarding email sequence... | [coreyhaines31/marketingskills](https://github.com/coreyhaines31/marketingskills) | launch-strategy |
 | `lead-research-assistant` | Identifies high-quality leads for your product or service by analyzing your business, searching for target companies, and providing actionable contact...  Use cases: Identifying target accounts for sales outreach, Preparing for business development ... | [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills) | lead-research-assistant |

@@ -11,7 +11,8 @@
 
 | Intent | Command Signature | Note |
 |:---|:---|:---|
-| **Install** | `skill_install_workflow.py <url> [--skill <name>] [--force]` | **推荐**: 完整工作流(clone→scan→LLM→install) |
+| **Install** | `#skill-install-agent <url> [--skill <name>] [--force]` | **推荐**: 智能体工作流(clone→scan→审核→install) |
+| **Install** | `skill_install_workflow.py <url> [--skill <name>] [--force]` | (旧版) LangGraph工作流，将被废弃 |
 | **Install** | `skill_manager.py install <src>` | 快速安装(本地/包)，无扫描 |
 | **Uninstall** | `skill_manager.py uninstall <name> [...]` | **Sync DB Auto, 支持批量** |
 | **List** | `skill_manager.py list` | 查看已装技能 |
@@ -40,7 +41,7 @@
 - **Test**: `test <name>`
 - **Presets**: `context7`, `tavily`, `filesystem`, `github`, `sqlite`, `memory`
 
-## 4. 文件编辑 (File Editor)
+## 3. 自动化任务 (Hooks Manager)
 **Base**: `python bin/hooks_manager.py`
 
 - **Execute**: `execute [--hook-type <type>] [--force]`
@@ -58,7 +59,7 @@
 - `cleanup_old_downloads` (Session Start)
 - `create_delivery_snapshot` (Delivery)
 
-## 5. 文件系统权限 (FS Map)
+## 4. 文件编辑 (File Editor)
 **Base**: `python bin/file_editor.py`
 
 - **Replace**: `replace <file> <old> <new>`
@@ -70,7 +71,7 @@
 - **Delete Between**: `delete-between <file> <start_marker> <end_marker>`
 - **Update JSON**: `update-json <file> <field_path> <value>`
 
-## 6. 外部访问协议 (Ext. Access)
+## 5. 外部访问协议 (Ext. Access)
 
 | Zone | Path | Permission | Role |
 |:---|:---|:---|:---|
@@ -79,15 +80,12 @@
 | **Work** | `mybox/` | ⚡ **Free R/W** | 唯一的沙盒环境 |
 | **Output** | `delivery/` | 🟢 **Write-Once** | 最终交付物 |
 
-## 7. 版本信息 (Version)
+## 6. 版本信息 (Version)
 
 ### GitHub Protocol
 ⚠️ **STRICT RULE**: 禁止直接 `git clone` 或 `curl`。必须经过加速器/解析器。
 
-| Action | Tool Command |
-|:---|:---|
-| **DB Import** | `python bin/skills_db_sync.py --import <json>` |
-| **Get File** | `python bin/gh_fetch.py raw <user/repo/branch/path>` |
+仓库操作使用 `clone_manager.py` (参见第 1.1 节)。
 
-**Last Updated**: 2026-02-04
-**Ver**: v6.0 (Remove: improvement_manager; Add: skill_install_workflow, clone_manager)
+**Last Updated**: 2026-02-27
+**Ver**: v7.0 (Add: #skill-install-agent; Deprecate: skill_install_workflow.py)

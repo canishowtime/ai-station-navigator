@@ -209,3 +209,31 @@ Skills Agent 返回包含以下字段时，Kernel **必须**主动输出：
 |:---|:---|:---|:---|
 | **worker_agent** | `.claude/agents/worker_agent.md` | 执行 `bin/` 脚本 | 幂等性 (5s缓存) |
 | **skills_agent** | `.claude/agents/skills_agent.md` | 执行已安装技能 | 超时 (90s限制) |
+
+---
+
+## 6. Python 编码兼容性 [P0]
+
+**问题根源**: Windows 下 Python 默认使用 GBK 编码，无法输出 emoji，导致脚本崩溃。
+
+**强制要求**: 所有 Python 脚本开头必须添加 UTF-8 编码设置：
+
+```python
+import sys
+import os
+
+# Windows UTF-8 兼容 (P0 - 所有脚本必须包含)
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except:
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+```
+
+**禁止使用 emoji**: 输出信息中禁止使用 emoji，使用 ASCII 替代：
+- `✅` → `[OK]` / `success:`
+- `❌` → `[ERROR]` / `failed:`
+- `⚠️` → `[WARN]` / `warning:`

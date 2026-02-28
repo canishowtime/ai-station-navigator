@@ -31,11 +31,23 @@ v2.1 - Feature Complete:
 """
 
 import argparse
-import json
+import sys
 import os
+
+# Windows UTF-8 兼容 (P0 - 所有脚本必须包含)
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except:
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+
+import json
 import shutil
 import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -54,20 +66,23 @@ MCP_CONFIG_FILE = BASE_DIR / ".mcp.json"
 SETTINGS_FILE = BASE_DIR / ".claude" / "settings.local.json"
 BACKUP_DIR = BASE_DIR / "mybox" / "backups" / "mcp"
 
+# 平台特定命令 (P0 - 跨平台兼容)
+NPX_COMMAND = "npx.cmd" if sys.platform == 'win32' else "npx"
+
 # =============================================================================
 # 预设模板注册表 (Preset Templates Registry)
 # =============================================================================
 
 PRESET_TEMPLATES = {
     "context7": {
-        "command": "npx.cmd",
+        "command": "npx",
         "args": ["-y", "@upstash/context7-mcp@latest"],
         "env": {},
         "tools": ["mcp__context7__resolve-library-id", "mcp__context7__query-docs"],
         "description": "Context7 - 查询编程库文档和代码示例"
     },
     "tavily": {
-        "command": "npx.cmd",
+        "command": "npx",
         "args": [
             "-y",
             "mcp-remote",
@@ -562,10 +577,14 @@ class MCPManager:
             else:
                 final_args.append(arg)
 
-        # 添加服务器
+        # 添加服务器（平台适配 npx 命令）
+        command = template["command"]
+        if command == "npx":
+            command = NPX_COMMAND
+
         self.add_server(
             name=name,
-            command=template["command"],
+            command=command,
             args=final_args,
             env=final_env,
             tools=template["tools"]
@@ -631,7 +650,12 @@ class MCPManager:
                 # 进程仍在运行 = 成功启动
                 success(f"服务器 '{name}' 启动成功！进程 ID: {process.pid}")
                 process.terminate()
-                process.wait(timeout=2)
+                try:
+                    process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    # terminate() 超时，强制终止
+                    process.kill()
+                    process.wait()
             elif poll_result == 0:
                 success(f"服务器 '{name}' 启动后正常退出（返回码: 0）")
             else:

@@ -25,14 +25,26 @@ v1.0 - Feature Complete:
 """
 
 import argparse
+import sys
+import os
+
+# Windows UTF-8 兼容 (P0 - 所有脚本必须包含)
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except:
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+
 import concurrent.futures
 import glob
 import json
-import os
 import re
 import shutil
 import subprocess
-import sys
 import time
 import zipfile
 from datetime import datetime
@@ -1210,6 +1222,31 @@ class SkillInstaller:
                 return False
 
     @staticmethod
+    def batch_remove_from_db(folder_names: List[str]) -> Dict[str, bool]:
+        """批量从数据库删除技能记录（单次连接优化）
+
+        Args:
+            folder_names: 技能文件夹名列表
+
+        Returns:
+            {folder_name: success_flag}
+        """
+        results = {}
+        with db_connection() as (db, Skill):
+            if db is None:
+                return {name: False for name in folder_names}
+
+            for folder_name in folder_names:
+                try:
+                    removed = db.remove(Skill.folder_name == folder_name)
+                    results[folder_name] = len(removed) > 0
+                except Exception as e:
+                    warn(f"数据库删除失败 {folder_name}: {e}")
+                    results[folder_name] = False
+
+        return results
+
+    @staticmethod
     def _validate_skill_structure(skill_dir: Path) -> Tuple[bool, str]:
         """验证技能目录结构"""
         # 检查 SKILL.md 是否存在
@@ -2164,61 +2201,63 @@ def main():
         success_count = 0
         failed_list = []
 
-        # 遍历每个技能
-        for skill_name in skill_names:
-            # 1. 通过 name 查找 folder_name
-            folder_name = None
-            with db_connection() as (db, Skill):
-                if db:
+        # 阶段1：批量查询 folder_name（单次DB连接）
+        to_uninstall = []  # [(skill_name, folder_name, skill_dir)]
+        with db_connection() as (db, Skill):
+            if db:
+                for skill_name in skill_names:
+                    folder_name = None
                     try:
-                        result = db.get(Skill.name == skill_name)
+                        result = db.get(Skill.folder_name == skill_name) or db.get(Skill.name == skill_name)
                         if result:
                             folder_name = result.get("folder_name")
                     except Exception:
                         pass
 
-            # 2. 如果找不到 folder_name，尝试直接用输入作为 folder_name
-            if not folder_name:
-                folder_name = skill_name
+                    if not folder_name:
+                        folder_name = skill_name
 
-            skill_dir = CLAUDE_SKILLS_DIR / folder_name
+                    skill_dir = CLAUDE_SKILLS_DIR / folder_name
+                    if not skill_dir.exists():
+                        error(f"技能不存在: {skill_name} (查找目录: {folder_name})")
+                        failed_list.append(skill_name)
+                    else:
+                        to_uninstall.append((skill_name, folder_name, skill_dir))
 
-            # 3. 检查技能是否存在
-            if not skill_dir.exists():
-                error(f"技能不存在: {skill_name} (查找目录: {folder_name})")
-                failed_list.append(skill_name)
-                continue
-
-            # 4. 确认删除
+        # 阶段2：删除文件
+        success_folders = []  # 记录成功删除的文件夹名
+        for skill_name, folder_name, skill_dir in to_uninstall:
+            # 确认删除
             if not args.force:
                 print(f"即将删除技能: {skill_name}")
                 print(f"路径: {skill_dir}")
                 print("正在删除...")
 
-            # 5. 删除目录（原子操作：文件 + 数据库）
             try:
-                # 5.0 只读文件处理器（Windows 兼容）
+                # 只读文件处理器（Windows 兼容）
                 def _remove_readonly(func, path, excinfo):
                     """处理 Windows 只读文件删除问题"""
                     import os
                     os.chmod(path, 0o777)
                     func(path)
 
-                # 5.1 删除文件
                 shutil.rmtree(skill_dir, onerror=_remove_readonly)
-
-                # 5.2 从数据库移除（使用 folder_name）
-                db_remove_success = SkillInstaller._remove_skill_from_db(folder_name)
-                if db_remove_success:
-                    success(f"已删除: {skill_name} (数据库已同步)")
-                    success_count += 1
-                else:
-                    # 数据库操作失败，文件已删除但数据库未更新
-                    warn(f"文件已删除，但数据库同步失败: {skill_name}")
-                    success_count += 1
+                success_folders.append(folder_name)
             except Exception as e:
                 error(f"删除失败: {skill_name} - {e}")
                 failed_list.append(skill_name)
+
+        # 阶段3：批量删除DB（单次连接）
+        if success_folders:
+            db_results = SkillInstaller.batch_remove_from_db(success_folders)
+            for folder_name, db_success in db_results.items():
+                if db_success:
+                    success(f"已删除: {folder_name} (数据库已同步)")
+                    success_count += 1
+                else:
+                    warn(f"文件已删除，但数据库同步失败: {folder_name}")
+                    # 文件已删除，即使DB失败也计入成功
+                    success_count += 1
 
         # 汇总结果
         print()

@@ -572,33 +572,33 @@ def get_skills_list():
 # =============================================================================
 
 # Python 最低版本要求（cisco-ai-skill-scanner 需要 3.10+）
-MIN_PYTHON_VERSION = (3, 10)
+# MIN_PYTHON_VERSION = (3, 10)
 
 
-def check_python_version():
-    """检查 Python 版本是否满足要求
-
-    Returns:
-        dict: {current: str, minimum: str, satisfied: bool, recommendation: str}
-    """
-    current = sys.version_info[:3]
-    satisfied = current >= MIN_PYTHON_VERSION
-
-    recommendation = None
-    if not satisfied:
-        if sys.platform == 'darwin':
-            recommendation = 'brew install python@3.11'
-        elif sys.platform == 'win32':
-            recommendation = 'Download from python.org or use: winget install Python.Python.3.11'
-        else:
-            recommendation = 'Visit python.org or use system package manager'
-
-    return {
-        "current": f"{current[0]}.{current[1]}.{current[2]}",
-        "minimum": f"{MIN_PYTHON_VERSION[0]}.{MIN_PYTHON_VERSION[1]}",
-        "satisfied": satisfied,
-        "recommendation": recommendation
-    }
+# def check_python_version():
+#     """检查 Python 版本是否满足要求
+#
+#     Returns:
+#         dict: {current: str, minimum: str, satisfied: bool, recommendation: str}
+#     """
+#     current = sys.version_info[:3]
+#     satisfied = current >= MIN_PYTHON_VERSION
+#
+#     recommendation = None
+#     if not satisfied:
+#         if sys.platform == 'darwin':
+#             recommendation = 'brew install python@3.11'
+#         elif sys.platform == 'win32':
+#             recommendation = 'Download from python.org or use: winget install Python.Python.3.11'
+#         else:
+#             recommendation = 'Visit python.org or use system package manager'
+#
+#     return {
+#         "current": f"{current[0]}.{current[1]}.{current[2]}",
+#         "minimum": f"{MIN_PYTHON_VERSION[0]}.{MIN_PYTHON_VERSION[1]}",
+#         "satisfied": satisfied,
+#         "recommendation": recommendation
+#     }
 
 
 def main():
@@ -614,8 +614,8 @@ def main():
     }
 
     # 0. 检查 Python 版本
-    version_info = check_python_version()
-    output["python_version"] = version_info
+    # version_info = check_python_version()
+    # output["python_version"] = version_info
 
     # 平台信息（只调用一次）
     platform_dir, platform_name = get_platform_info()

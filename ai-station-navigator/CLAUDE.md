@@ -46,8 +46,7 @@
 4. **强制路由验证** [P0-FORCE]: 禁止 Kernel 直接使用 Bash/Skill 工具，必须按派发协议Protocol对接子智能体，使用 `Task(subagent_type, prompt)` 派发；禁止使用 run_in_background=true，直接解析 Task 返回值中的数据；
 - 意图是 `安装技能`|`删除技能` → 路由至 `skill_manager_agent` 执行；多步任务串行派发，禁止并行。
 - 意图是 `执行Bash`|`install`|`执行脚本`→ 路由至 `worker_agent` 执行；多步任务串行派发，禁止并行；对接内容中“文件路径”优先使用引用方式，禁止读取和嵌入内容。
-- 意图是 `执行skills`|`调用技能` → 按`skills_agent_Protocol`预处理→ 路由至 `skills_agent` 执行；多步任务串行派发，禁止并行；派发任务格式“使用 Skill 工具调用 @<技能名>”；对接内容中”文件路径”优先使用引用方式，禁止读取和嵌入内容。
-
+- 意图是 `使用@@<技能名>执行skills` |`调用技能`→ 按`skills_agent_Protocol`预处理→ 路由至 `skills_agent` 执行；多步任务串行派发，禁止并行；派发任务格式“使用 Skill 工具调用 <技能名>”；”文件路径”优先使用引用方式对接，禁止读取。
 
 ### 2.3 sub_agent 结果处理 [P0]
 1. **强制透传** sub_agent 返回含明确状态标识的结果时（如 state: success/✅成功/结果摘要），直接透传展示，禁止触发额外交互流程。
@@ -90,7 +89,7 @@
 - **技能列表**: `python bin/skill_manager.py list` → `worker_agent`
 - **映射图生成**: `python bin/update_skills_mapping.py` → `worker_agent`
 - **技能搜索**: `python bin/skill_manager.py search <kw>` → `worker_agent`
-- **使用技能**: `@技能名` → 按`skills_agent_Protocol`预处理 → 派发`skills_agent`
+- **使用技能**: `@@技能名` → 按`skills_agent_Protocol`预处理 → 派发`skills_agent`
 
 ### 2.7 能力展示规则: 
 用户询问能力时，用自然语言描述"提供什么就能获得什么"，不展示命令：
@@ -104,12 +103,12 @@
 **mybox 结构**: workspace(工作文件), temp(临时), cache(缓存), logs(日志)。
 **禁止混乱目录**: 使用规范目录，禁止创建 analysis/ 等未规范目录。
 **依赖管理**: `python -m pip install <package>` (禁止全局 pip)。
+**GIthub clone**: clone操作务必加载根目录加速器 `config.json` 
+**文档优先**: 先查 `docs/` 再操作。连续失败 2 次 -> 停止并询问。
+**格式规则**: 禁止客套话。禁止道歉。遇错 -> 分析代码 -> 重试。
 **Python 路径处理** [P0]:
 - **bin脚本执行**: 使用 `python bin/xxx.py` (相对路径优先)
 - **禁止硬编码绝对路径**: 不使用 `F:\...\bin\python.exe` 或 `/f/.../bin/python`
 - **跨平台兼容**: 优先 `python`，失败则尝试 `python3`
 - **Git Bash路径**: 使用 `/f/...` 格式，不用 `F:\...`
 - **便携版检测**: 仅在确认 `bin/python/python.exe` 存在时使用
-**GIthub clone**: clone操作务必加载根目录加速器 `config.json` 
-**文档优先**: 先查 `docs/` 再操作。连续失败 2 次 -> 停止并询问。
-**格式规则**: 禁止客套话。禁止道歉。遇错 -> 分析代码 -> 重试。

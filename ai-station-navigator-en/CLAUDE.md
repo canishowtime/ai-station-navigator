@@ -47,7 +47,7 @@
 4. **Forced Routing Validation** [P0-FORCE]: Kernel is prohibited from using Bash/Skill tools directly, must interface with sub-agents via Protocol, use `Task(subagent_type, prompt)` for dispatch; prohibit run_in_background=true, directly parse data from Task return values;
 - Intent is `install skill`|`delete skill` → route to `skill_manager_agent` for execution; multi-step tasks dispatched serially, parallel execution prohibited.
 - Intent is `execute Bash`|`install`|`execute script` → route to `worker_agent` for execution; multi-step tasks dispatched serially, parallel execution prohibited; prefer using references for "file paths" in interface content, reading and embedding content prohibited.
-- Intent is `execute skills`|`call skill` → preprocess per `skills_agent_Protocol` → route to `skills_agent` for execution; multi-step tasks dispatched serially, parallel execution prohibited; dispatch format "Use Skill tool to call @<skill_name>"; prefer using references for "file paths" in interface content, reading and embedding content prohibited.
+- Intent is `use @@<skill_name> to execute skills` |`call skill` → preprocess per `skills_agent_Protocol` → route to `skills_agent` for execution; multi-step tasks dispatched serially, parallel execution prohibited; dispatch format "Use Skill tool to call <skill_name>"; prefer using references for "file paths" in interface content, reading and embedding content prohibited.
 
 
 ### 2.3 sub_agent Result Processing [P0]
@@ -91,7 +91,7 @@
 - **Skill List**: `python bin/skill_manager.py list` → `worker_agent`
 - **Mapping Generate**: `python bin/update_skills_mapping.py` → `worker_agent`
 - **Skill Search**: `python bin/skill_manager.py search <kw>` → `worker_agent`
-- **Use Skill**: `@skill_name` → preprocess per `skills_agent_Protocol` → dispatch `skills_agent`
+- **Use Skill**: `@@skill_name` → preprocess per `skills_agent_Protocol` → dispatch `skills_agent`
 
 ### 2.7 Capability Display Rules:
 When user asks about capabilities, describe "what you provide gets what" in natural language, do not show commands:
@@ -105,12 +105,12 @@ When user asks about capabilities, describe "what you provide gets what" in natu
 **mybox Structure**: workspace (working files), temp (temporary), cache (cache), logs (logs).
 **Prohibit Chaotic Directories**: Use standard directories, creating unstandardized directories like analysis/ prohibited.
 **Dependency Management**: `python -m pip install <package>` (global pip prohibited).
+**GIthub clone**: Clone operations must load root accelerator `config.json`
+**Documentation First**: Check `docs/` before operations. 2 consecutive failures -> stop and ask.
+**Format Rules**: No pleasantries. No apologies. On error -> analyze code -> retry.
 **Python Path Handling** [P0]:
 - **bin script execution**: Use `python bin/xxx.py` (relative path priority)
 - **Prohibit hard-coded absolute paths**: Do not use `F:\...\bin\python.exe` or `/f/.../bin/python`
 - **Cross-platform compatibility**: Prefer `python`, try `python3` if failed
 - **Git Bash path**: Use `/f/...` format, not `F:\...`
 - **Portable version detection**: Only use when confirmed `bin/python/python.exe` exists
-**GIthub clone**: Clone operations must load root accelerator `config.json`
-**Documentation First**: Check `docs/` before operations. 2 consecutive failures -> stop and ask.
-**Format Rules**: No pleasantries. No apologies. On error -> analyze code -> retry.

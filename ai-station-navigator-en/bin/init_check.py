@@ -1,6 +1,6 @@
 """
-Initialization Check Script - Cross-platform Offline Installation Support
-Supports Windows (win32) and macOS (darwin)
+初始化检查脚本 - 跨平台离线安装支持
+支持 Windows (win32) 和 macOS (darwin)
 """
 import json
 import sys
@@ -110,9 +110,9 @@ def get_site_packages_path():
 # =============================================================================
 
 PYPI_MIRRORS = [
-    ('Official (Global)', 'https://pypi.org/simple'),
-    ('Tsinghua (China)', 'https://pypi.tuna.tsinghua.edu.cn/simple'),
-    ('Aliyun (China)', 'https://mirrors.aliyun.com/pypi/simple/'),
+    ('官方 (全球)', 'https://pypi.org/simple'),
+    ('清华 (中国)', 'https://pypi.tuna.tsinghua.edu.cn/simple'),
+    ('阿里云 (中国)', 'https://mirrors.aliyun.com/pypi/simple/'),
 ]
 
 def get_fastest_mirror(timeout=3):
@@ -129,7 +129,7 @@ def get_fastest_mirror(timeout=3):
     if results:
         results.sort()
         return results[0][1], results[0][2]
-    return 'Official (Global)', 'https://pypi.org/simple'
+    return '官方 (全球)', 'https://pypi.org/simple'
 
 
 # =============================================================================
@@ -184,7 +184,7 @@ def check_source_deps():
             if has_offline:
                 install_info["offline_path"] = str(zip_path)
                 install_info["install_method"] = "extract"
-                install_info["install_hint"] = "Extract to site-packages directory"
+                install_info["install_hint"] = "解压到 site-packages 目录"
             elif not local_only and github_repo:
                 # 仅非本地安装限制的包才生成在线安装命令
                 install_info["online_install"] = f"pip install git+https://github.com/{github_repo}.git"
@@ -454,7 +454,7 @@ def generate_install_commands(missing_pypi, missing_source):
                 )
             else:
                 commands["source_commands"].append(
-                    f"# Extract {dep['name']} to python/Lib/site-packages"
+                    f"# 解压 {dep['name']} 到 python/Lib/site-packages"
                 )
         elif dep.get("online_install"):
             commands["source_commands"].append(dep["online_install"])
@@ -572,33 +572,33 @@ def get_skills_list():
 # =============================================================================
 
 # Python 最低版本要求（cisco-ai-skill-scanner 需要 3.10+）
-MIN_PYTHON_VERSION = (3, 10)
+# MIN_PYTHON_VERSION = (3, 10)
 
 
-def check_python_version():
-    """检查 Python 版本是否满足要求
-
-    Returns:
-        dict: {current: str, minimum: str, satisfied: bool, recommendation: str}
-    """
-    current = sys.version_info[:3]
-    satisfied = current >= MIN_PYTHON_VERSION
-
-    recommendation = None
-    if not satisfied:
-        if sys.platform == 'darwin':
-            recommendation = 'brew install python@3.11'
-        elif sys.platform == 'win32':
-            recommendation = 'Download from python.org or use: winget install Python.Python.3.11'
-        else:
-            recommendation = 'Visit python.org or use system package manager'
-
-    return {
-        "current": f"{current[0]}.{current[1]}.{current[2]}",
-        "minimum": f"{MIN_PYTHON_VERSION[0]}.{MIN_PYTHON_VERSION[1]}",
-        "satisfied": satisfied,
-        "recommendation": recommendation
-    }
+# def check_python_version():
+#     """检查 Python 版本是否满足要求
+#
+#     Returns:
+#         dict: {current: str, minimum: str, satisfied: bool, recommendation: str}
+#     """
+#     current = sys.version_info[:3]
+#     satisfied = current >= MIN_PYTHON_VERSION
+#
+#     recommendation = None
+#     if not satisfied:
+#         if sys.platform == 'darwin':
+#             recommendation = 'brew install python@3.11'
+#         elif sys.platform == 'win32':
+#             recommendation = 'Download from python.org or use: winget install Python.Python.3.11'
+#         else:
+#             recommendation = 'Visit python.org or use system package manager'
+#
+#     return {
+#         "current": f"{current[0]}.{current[1]}.{current[2]}",
+#         "minimum": f"{MIN_PYTHON_VERSION[0]}.{MIN_PYTHON_VERSION[1]}",
+#         "satisfied": satisfied,
+#         "recommendation": recommendation
+#     }
 
 
 def main():
@@ -614,8 +614,8 @@ def main():
     }
 
     # 0. 检查 Python 版本
-    version_info = check_python_version()
-    output["python_version"] = version_info
+    # version_info = check_python_version()
+    # output["python_version"] = version_info
 
     # 平台信息（只调用一次）
     platform_dir, platform_name = get_platform_info()

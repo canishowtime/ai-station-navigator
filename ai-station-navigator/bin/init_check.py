@@ -318,7 +318,10 @@ def install_source_package(zip_path, site_packages):
                     with open(target_path, 'wb') as f:
                         f.write(zf.read(member))
         return True
-    except (zipfile.BadZipFile, OSError, IOError):
+    except (zipfile.BadZipFile, OSError, IOError) as e:
+        # 输出到 stderr，不影响 JSON 结果
+        import sys
+        print(f"[ERROR] install_source_package failed: {type(e).__name__}: {e}", file=sys.stderr)
         return False
 
 
@@ -423,8 +426,9 @@ def generate_install_commands(missing_pypi, missing_source):
             zip_path = dep["offline_path"]
             if site_packages:
                 # 生成安全的解压命令（使用脚本方式，避免命令注入）
-                safe_zip = shlex.quote(str(zip_path))
-                safe_site = shlex.quote(str(site_packages))
+                # 使用 repr() 生成 Python 字符串字面量（而非 shlex.quote 用于 shell）
+                safe_zip = repr(str(zip_path))
+                safe_site = repr(str(site_packages))
                 # 使用 heredoc 方式生成临时脚本
                 commands["extract_commands"].append(
                     f"python - << 'EOF'\n"
@@ -567,9 +571,40 @@ def get_skills_list():
 # 主函数
 # =============================================================================
 
+# Python 最低版本要求（cisco-ai-skill-scanner 需要 3.10+）
+MIN_PYTHON_VERSION = (3, 10)
+
+
+def check_python_version():
+    """检查 Python 版本是否满足要求
+
+    Returns:
+        dict: {current: str, minimum: str, satisfied: bool, recommendation: str}
+    """
+    current = sys.version_info[:3]
+    satisfied = current >= MIN_PYTHON_VERSION
+
+    recommendation = None
+    if not satisfied:
+        if sys.platform == 'darwin':
+            recommendation = 'brew install python@3.11'
+        elif sys.platform == 'win32':
+            recommendation = 'Download from python.org or use: winget install Python.Python.3.11'
+        else:
+            recommendation = 'Visit python.org or use system package manager'
+
+    return {
+        "current": f"{current[0]}.{current[1]}.{current[2]}",
+        "minimum": f"{MIN_PYTHON_VERSION[0]}.{MIN_PYTHON_VERSION[1]}",
+        "satisfied": satisfied,
+        "recommendation": recommendation
+    }
+
+
 def main():
     output = {
         "platform": None,
+        "python_version": None,
         "deps": None,
         "install": None,
         "update": None,
@@ -577,6 +612,10 @@ def main():
         "skills_count": 0,
         "need_install_reminder": False
     }
+
+    # 0. 检查 Python 版本
+    version_info = check_python_version()
+    output["python_version"] = version_info
 
     # 平台信息（只调用一次）
     platform_dir, platform_name = get_platform_info()

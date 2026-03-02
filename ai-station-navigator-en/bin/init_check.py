@@ -6,7 +6,7 @@ import json
 import sys
 import os
 
-# Windows UTF-8 Compatibility (P0 - All scripts must include)
+# Windows UTF-8 兼容 (P0 - 所有脚本必须包含)
 if sys.platform == 'win32':
     try:
         sys.stdout.reconfigure(encoding='utf-8')
@@ -27,7 +27,7 @@ import zipfile
 import shlex
 
 # =============================================================================
-# Path Configuration
+# 路径配置
 # =============================================================================
 
 BASE_DIR = Path(__file__).parent.parent
@@ -37,11 +37,11 @@ UPDATE_CACHE = BASE_DIR / ".claude" / "state" / ".update_cache"
 OFFLINE_PACKAGES = BASE_DIR / "mybox" / "cache" / "packages"
 
 # =============================================================================
-# Dependency Configuration
+# 依赖配置
 # =============================================================================
 
-# PyPI Core Dependencies (module name -> package name)
-# pip must be first as it's used to install other packages
+# PyPI 核心依赖 (模块名 -> 包名)
+# pip 必须在最前面，因为它用于安装其他包
 CORE_DEPS = [
     ('pip', 'pip'),
     ('tinydb', 'TinyDB'),
@@ -49,7 +49,7 @@ CORE_DEPS = [
     ('yara_x', 'yara-x'),
     ('frontmatter', 'python-frontmatter'),
     ('confusable_homoglyphs', 'confusable-homoglyphs'),
-    # cisco-ai-skill-scanner transitive dependencies
+    # cisco-ai-skill-scanner 传递依赖
     ('httpx', 'httpx'),
     ('httpcore', 'httpcore'),
     ('h11', 'h11'),
@@ -59,21 +59,21 @@ CORE_DEPS = [
     ('typing_extensions', 'typing_extensions'),
 ]
 
-# GitHub/Source Package Dependencies
-# Format: (module_name, package_name, zip_file, local_only, github_repo)
+# GitHub/源码包依赖
+# 格式: (模块名, 包名, zip文件, 是否仅本地安装, github_repo)
 SOURCE_DEPS = [
     ('skill_scanner', 'cisco-ai-skill-scanner', 'cisco-skill-scanner-lite.zip', True, 'cisco-ai-defense/skill-scanner'),
 ]
 
 # =============================================================================
-# Platform Detection
+# 平台检测
 # =============================================================================
 
 def get_platform_info():
-    """Get platform information
+    """获取平台信息
 
     Returns:
-        (platform_dir, platform_name) or (None, None)
+        (platform_dir, platform_name) 或 (None, None)
     """
     if sys.platform == 'win32':
         return 'windows', 'Windows'
@@ -83,9 +83,9 @@ def get_platform_info():
 
 
 def get_site_packages_path():
-    """Get site-packages path (prefer standard Lib/site-packages)"""
+    """获取 site-packages 路径（优先使用标准 Lib/site-packages）"""
     try:
-        # macOS: prioritize user directory to avoid permission issues
+        # macOS 优先使用用户目录，避免权限问题
         if sys.platform == 'darwin' and site.USER_SITE:
             user_site = Path(site.USER_SITE)
             if user_site.exists() or user_site.parent.exists():
@@ -93,12 +93,12 @@ def get_site_packages_path():
 
         site_packages = site.getsitepackages()
         if site_packages:
-            # Prefer standard Lib/site-packages path
-            # Portable Python usually has multiple paths, last is Lib/site-packages
+            # 优先返回标准的 Lib/site-packages 路径
+            # 便携版 Python 通常有多个路径，最后一个是 Lib/site-packages
             for sp in reversed(site_packages):
                 if 'Lib/site-packages' in str(sp):
                     return Path(sp)
-            # If no Lib/site-packages found, return last one
+            # 如果没有找到 Lib/site-packages，返回最后一个
             return Path(site_packages[-1])
     except (AttributeError, OSError):
         pass
@@ -106,7 +106,7 @@ def get_site_packages_path():
 
 
 # =============================================================================
-# Mirror Sources
+# 镜像源
 # =============================================================================
 
 PYPI_MIRRORS = [
@@ -116,7 +116,7 @@ PYPI_MIRRORS = [
 ]
 
 def get_fastest_mirror(timeout=3):
-    """Speed test to select fastest mirror"""
+    """测速选择最快镜像源"""
     results = []
     for name, url in PYPI_MIRRORS:
         try:
@@ -133,14 +133,14 @@ def get_fastest_mirror(timeout=3):
 
 
 # =============================================================================
-# Dependency Check
+# 依赖检查
 # =============================================================================
 
 def check_pypi_deps():
-    """Check PyPI core dependencies
+    """检查 PyPI 核心依赖
 
     Returns:
-        list: List of missing package names
+        list: 缺失的包名列表
     """
     missing = []
     for module, pkg in CORE_DEPS:
@@ -152,16 +152,16 @@ def check_pypi_deps():
 
 
 def check_source_deps():
-    """Check source package dependencies
+    """检查源码包依赖
 
     Returns:
-        list: List of missing dependency info dicts
+        list: 缺失的依赖信息字典列表
     """
     missing = []
     source_dir = OFFLINE_PACKAGES / "source"
 
     for item in SOURCE_DEPS:
-        # Compatible with new and old format: (module, pkg, zip_file, local_only, github_repo?)
+        # 兼容新旧格式: (module, pkg, zip_file, local_only, github_repo?)
         module = item[0]
         pkg = item[1]
         zip_file = item[2]
@@ -186,7 +186,7 @@ def check_source_deps():
                 install_info["install_method"] = "extract"
                 install_info["install_hint"] = "Extract to site-packages directory"
             elif not local_only and github_repo:
-                # Only generate online install command for non-local-only packages
+                # 仅非本地安装限制的包才生成在线安装命令
                 install_info["online_install"] = f"pip install git+https://github.com/{github_repo}.git"
 
             missing.append(install_info)
@@ -195,18 +195,18 @@ def check_source_deps():
 
 
 # =============================================================================
-# Auto Install
+# 自动安装
 # =============================================================================
 
 def install_pip_wheel(offline_dir, site_packages):
-    """Directly extract pip wheel to site-packages (no pip required)
+    """直接解压 pip wheel 到 site-packages（无需 pip 自身）
 
     Args:
-        offline_dir: Local cache directory
-        site_packages: site-packages path
+        offline_dir: 本地缓存目录
+        site_packages: site-packages 路径
 
     Returns:
-        bool: Success
+        bool: 是否成功
     """
     if not offline_dir or not offline_dir.exists():
         return False
@@ -214,7 +214,7 @@ def install_pip_wheel(offline_dir, site_packages):
     if not site_packages:
         return False
 
-    # Find pip wheel file
+    # 查找 pip wheel 文件
     pip_wheels = list(offline_dir.glob("pip-*-py3-none-any.whl"))
     if not pip_wheels:
         return False
@@ -228,16 +228,16 @@ def install_pip_wheel(offline_dir, site_packages):
 
 
 def install_package(pkg_name, offline_dir=None):
-    """Install single package, prefer local cache
+    """安装单个包，优先本地缓存
 
     Args:
-        pkg_name: Package name
-        offline_dir: Local cache directory
+        pkg_name: 包名
+        offline_dir: 本地缓存目录
 
     Returns:
-        (success, method): (success, install_method)
+        (success, method): (是否成功, 安装方法)
     """
-    # 1. Try local install
+    # 1. 尝试本地安装
     if offline_dir and offline_dir.exists():
         try:
             cmd = [sys.executable, "-m", "pip", "install", "--no-index",
@@ -248,7 +248,7 @@ def install_package(pkg_name, offline_dir=None):
         except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
             pass
 
-    # 2. Try online install
+    # 2. 尝试在线安装
     try:
         cmd = [sys.executable, "-m", "pip", "install", pkg_name]
         result = subprocess.run(cmd, capture_output=True, timeout=180)
@@ -258,20 +258,20 @@ def install_package(pkg_name, offline_dir=None):
 
 
 def install_source_package(zip_path, site_packages):
-    """Extract and install source package (safe version, prevents Zip Slip)
+    """解压安装源码包（安全版本，防止 Zip Slip）
 
     Args:
-        zip_path: Package zip path
-        site_packages: site-packages path
+        zip_path: 压缩包路径
+        site_packages: site-packages 路径
 
     Returns:
-        bool: Success
+        bool: 是否成功
     """
     if not site_packages:
         return False
     try:
         with zipfile.ZipFile(zip_path) as zf:
-            # Check zip top-level directory structure
+            # 检查 zip 顶层目录结构
             top_dirs = set()
             for name in zf.namelist():
                 if name.endswith('/'):
@@ -280,11 +280,11 @@ def install_source_package(zip_path, site_packages):
                 if len(parts) > 1:
                     top_dirs.add(parts[0])
 
-            # Determine prefix: detect if single root dir is a Python package (contains __init__.py)
-            # If so, preserve directory structure, otherwise strip (compatible with distribution structure)
+            # 确定前缀：检测单一根目录是否为 Python 包（含 __init__.py）
+            # 若是则保留目录结构，否则剥离（兼容分发包结构）
             if len(top_dirs) == 1:
                 root_dir = list(top_dirs)[0]
-                # Check if root directory contains __init__.py (Python package marker)
+                # 检查根目录内是否含 __init__.py（Python 包标记）
                 has_init = any(
                     name == f"{root_dir}/__init__.py"
                     for name in zf.namelist()
@@ -293,22 +293,22 @@ def install_source_package(zip_path, site_packages):
             else:
                 prefix = ''
 
-            # Safe extraction: validate path, prevent Zip Slip
+            # 安全解压：验证路径，防止 Zip Slip
             for member in zf.namelist():
                 if not member.startswith(prefix):
                     continue
 
-                # Get relative path
+                # 获取相对路径
                 rel_path = member[len(prefix):] if prefix else member
                 if not rel_path or rel_path.startswith('/'):
                     continue
 
-                # Verify target path is within site-packages
+                # 验证目标路径在 site-packages 内
                 target_path = (site_packages / rel_path).resolve()
                 try:
                     target_path.relative_to(site_packages.resolve())
                 except ValueError:
-                    # Path escape, skip
+                    # 路径逃逸，跳过
                     continue
 
                 if member.endswith('/'):
@@ -318,21 +318,24 @@ def install_source_package(zip_path, site_packages):
                     with open(target_path, 'wb') as f:
                         f.write(zf.read(member))
         return True
-    except (zipfile.BadZipFile, OSError, IOError):
+    except (zipfile.BadZipFile, OSError, IOError) as e:
+        # 输出到 stderr，不影响 JSON 结果
+        import sys
+        print(f"[ERROR] install_source_package failed: {type(e).__name__}: {e}", file=sys.stderr)
         return False
 
 
 def auto_install_deps(missing_pypi, missing_source):
-    """Auto-install missing dependencies
+    """自动安装缺失依赖
 
     Args:
-        missing_pypi: List of missing PyPI packages
-        missing_source: List of missing source package info
+        missing_pypi: 缺失的 PyPI 包列表
+        missing_source: 缺失的源码包信息列表
 
     Returns:
         dict: {pypi_failed: [], source_failed: [], installed: []}
     """
-    # Cache platform info and site-packages path
+    # 缓存平台信息和 site-packages 路径
     platform_dir, _ = get_platform_info()
     offline_dir = OFFLINE_PACKAGES / platform_dir if platform_dir else None
     site_packages = get_site_packages_path()
@@ -343,21 +346,21 @@ def auto_install_deps(missing_pypi, missing_source):
         "installed": []
     }
 
-    # Prioritize pip (if missing)
+    # 优先处理 pip（如果缺失）
     pip_missing = 'pip' in missing_pypi
     other_packages = [p for p in missing_pypi if p != 'pip']
 
     if pip_missing:
-        # Directly extract pip wheel, no pip required
+        # 直接解压 pip wheel，无需 pip 自身
         success = install_pip_wheel(offline_dir, site_packages)
         if success:
             result["installed"].append("pip (offline)")
         else:
             result["pypi_failed"].append("pip")
-            # pip install failed, cannot continue installing other packages
+            # pip 安装失败，无法继续安装其他包
             other_packages = []
 
-    # Install other PyPI packages (requires pip)
+    # 安装其他 PyPI 包（需要 pip）
     for pkg in other_packages:
         success, method = install_package(pkg, offline_dir)
         if success:
@@ -365,7 +368,7 @@ def auto_install_deps(missing_pypi, missing_source):
         else:
             result["pypi_failed"].append(pkg)
 
-    # Install source packages
+    # 安装源码包
     for dep in missing_source:
         if dep.get("has_offline"):
             zip_path = Path(dep["offline_path"])
@@ -381,16 +384,16 @@ def auto_install_deps(missing_pypi, missing_source):
 
 
 # =============================================================================
-# Offline Install Command Generation (for manual installation scenarios)
+# 离线安装命令生成 (保留用于手动安装场景)
 # =============================================================================
 
 def generate_install_commands(missing_pypi, missing_source):
-    """Generate offline-priority install commands (safe version, prevents command injection)
+    """生成离线优先的安装命令（安全版本，防止命令注入）
 
     Returns:
         dict: {pypi_commands: [], source_commands: [], extract_commands: []}
     """
-    # Cache platform info and site-packages path
+    # 缓存平台信息和 site-packages 路径
     platform_dir, platform_name = get_platform_info()
     offline_dir = OFFLINE_PACKAGES / platform_dir if platform_dir else None
     site_packages = get_site_packages_path()
@@ -403,29 +406,30 @@ def generate_install_commands(missing_pypi, missing_source):
         "offline_available": offline_dir.exists() if offline_dir else False,
     }
 
-    # PyPI package install commands
+    # PyPI 包安装命令
     for pkg in missing_pypi:
-        # Use shlex.quote() to prevent command injection
+        # 使用 shlex.quote() 防止命令注入
         safe_pkg = shlex.quote(pkg)
         if offline_dir and offline_dir.exists():
-            # Offline first
+            # 离线优先
             safe_platform = shlex.quote(str(offline_dir))
             cmd = f"python -m pip install --no-index --find-links={safe_platform} {safe_pkg}"
             fallback = f"python -m pip install {safe_pkg}"
             commands["pypi_commands"].append(f"{cmd} || {fallback}")
         else:
-            # Online install
+            # 在线安装
             commands["pypi_commands"].append(f"python -m pip install {safe_pkg}")
 
-    # Source package install commands
+    # 源码包安装命令
     for dep in missing_source:
         if dep.get("has_offline"):
             zip_path = dep["offline_path"]
             if site_packages:
-                # Generate safe extraction command (use script approach to avoid command injection)
-                safe_zip = shlex.quote(str(zip_path))
-                safe_site = shlex.quote(str(site_packages))
-                # Use heredoc to generate temporary script
+                # 生成安全的解压命令（使用脚本方式，避免命令注入）
+                # 使用 repr() 生成 Python 字符串字面量（而非 shlex.quote 用于 shell）
+                safe_zip = repr(str(zip_path))
+                safe_site = repr(str(site_packages))
+                # 使用 heredoc 方式生成临时脚本
                 commands["extract_commands"].append(
                     f"python - << 'EOF'\n"
                     f"import zipfile\n"
@@ -445,7 +449,7 @@ def generate_install_commands(missing_pypi, missing_source):
                     f"                    target.parent.mkdir(parents=True, exist_ok=True)\n"
                     f"                    target.write_bytes(zf.read(m))\n"
                     f"            except ValueError:\n"
-                    f"                pass  # Skip files with path escape\n"
+                    f"                pass  # 跳过路径逃逸的文件\n"
                     f"EOF"
                 )
             else:
@@ -459,11 +463,11 @@ def generate_install_commands(missing_pypi, missing_source):
 
 
 # =============================================================================
-# Version Update Detection
+# 版本更新检测
 # =============================================================================
 
 def get_local_version():
-    """Get local version number"""
+    """获取本地版本号"""
     config_file = BASE_DIR / "config.json"
     if config_file.exists():
         try:
@@ -482,8 +486,8 @@ def get_local_version():
 
 
 def check_update():
-    """Check for version updates"""
-    # Cooldown check: no duplicate requests within 7 days
+    """检查版本更新"""
+    # 冷却检查：7天内不重复请求
     if UPDATE_CACHE.exists() and time.time() - UPDATE_CACHE.stat().st_mtime < 604800:
         return None
 
@@ -502,7 +506,7 @@ def check_update():
             local_parts = list(map(int, local.split(".")))
             remote_parts = list(map(int, remote.split(".")))
 
-            # Update cache
+            # 更新缓存
             VERSION_CACHE.parent.mkdir(parents=True, exist_ok=True)
             VERSION_CACHE.write_text(remote)
             UPDATE_CACHE.touch()
@@ -518,17 +522,17 @@ def check_update():
             else:
                 return {"has_update": False, "version": local}
     except (urllib.error.HTTPError, urllib.error.URLError, json.JSONDecodeError, ValueError, OSError) as e:
-        # Network or parse error, silently ignore
+        # 网络错误或解析错误，静默忽略
         pass
     return None
 
 
 # =============================================================================
-# Skills List
+# 技能列表
 # =============================================================================
 
 def refresh_mapping():
-    """Refresh skills mapping table"""
+    """刷新技能映射表"""
     script_path = BASE_DIR / 'bin' / 'register_missing_skills.py'
     if not script_path.exists():
         return False
@@ -545,7 +549,7 @@ def refresh_mapping():
 
 
 def get_skills_list():
-    """Get skills name list from database"""
+    """从数据库获取技能名称列表"""
     if not SKILLS_DB_FILE.exists():
         return []
 
@@ -564,12 +568,43 @@ def get_skills_list():
 
 
 # =============================================================================
-# Main Function
+# 主函数
 # =============================================================================
+
+# Python 最低版本要求（cisco-ai-skill-scanner 需要 3.10+）
+MIN_PYTHON_VERSION = (3, 10)
+
+
+def check_python_version():
+    """检查 Python 版本是否满足要求
+
+    Returns:
+        dict: {current: str, minimum: str, satisfied: bool, recommendation: str}
+    """
+    current = sys.version_info[:3]
+    satisfied = current >= MIN_PYTHON_VERSION
+
+    recommendation = None
+    if not satisfied:
+        if sys.platform == 'darwin':
+            recommendation = 'brew install python@3.11'
+        elif sys.platform == 'win32':
+            recommendation = 'Download from python.org or use: winget install Python.Python.3.11'
+        else:
+            recommendation = 'Visit python.org or use system package manager'
+
+    return {
+        "current": f"{current[0]}.{current[1]}.{current[2]}",
+        "minimum": f"{MIN_PYTHON_VERSION[0]}.{MIN_PYTHON_VERSION[1]}",
+        "satisfied": satisfied,
+        "recommendation": recommendation
+    }
+
 
 def main():
     output = {
         "platform": None,
+        "python_version": None,
         "deps": None,
         "install": None,
         "update": None,
@@ -578,28 +613,32 @@ def main():
         "need_install_reminder": False
     }
 
-    # Platform info (call once)
+    # 0. 检查 Python 版本
+    version_info = check_python_version()
+    output["python_version"] = version_info
+
+    # 平台信息（只调用一次）
     platform_dir, platform_name = get_platform_info()
     output["platform"] = platform_name
 
-    # 1. Check PyPI dependencies
+    # 1. 检查 PyPI 依赖
     missing_pypi = check_pypi_deps()
 
-    # 2. Check source dependencies
+    # 2. 检查源码依赖
     missing_source = check_source_deps()
 
-    # 3. Auto-install missing dependencies
+    # 3. 自动安装缺失依赖
     if missing_pypi or missing_source:
         install_result = auto_install_deps(missing_pypi, missing_source)
 
-        # Only report installation failures
+        # 只报告安装失败的
         if install_result["pypi_failed"] or install_result["source_failed"]:
             output["deps"] = {
                 "pypi_failed": install_result["pypi_failed"],
                 "source_failed": install_result["source_failed"],
             }
-            # Generate manual install commands on failure
-            # Pass complete missing_source info, let generate_install_commands filter itself
+            # 失败时生成手动安装命令
+            # 传递完整的 missing_source 信息，让 generate_install_commands 自己过滤
             failed_source_deps = [d for d in missing_source if d["name"] in install_result["source_failed"]]
             commands = generate_install_commands(
                 install_result["pypi_failed"],
@@ -611,26 +650,26 @@ def main():
                 _, mirror_url = get_fastest_mirror()
                 output["install"]["fallback_mirror"] = mirror_url
 
-        # Report successful installations
+        # 报告安装成功的
         if install_result["installed"]:
             output["install"] = output.get("install") or {}
             output["install"]["installed"] = install_result["installed"]
 
-    # 4. Refresh mapping table
+    # 4. 刷新映射表
     refresh_mapping()
 
-    # 5. Version detection
+    # 5. 版本检测
     update_info = check_update()
     if update_info:
         output["update"] = update_info
 
-    # 6. Get skills list
+    # 6. 获取技能列表
     skills = get_skills_list()
     output["skills"] = skills
     output["skills_count"] = len(skills)
     output["need_install_reminder"] = len(skills) < 10
 
-    # Output
+    # 输出
     print(json.dumps(output, ensure_ascii=False, indent=2))
 
 

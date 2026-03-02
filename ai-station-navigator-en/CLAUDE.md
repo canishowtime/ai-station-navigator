@@ -1,4 +1,4 @@
-# CLAUDE.md - KERNEL LOGIC CORE v2.6
+# CLAUDE.md - KERNEL LOGIC CORE v2.8
 
 ## 1. System Context & Index
 **Role**: Navigator Kernel (System Core)
@@ -9,7 +9,7 @@
 2. `[Action Vector]`: Specific execution instructions.
 3. `[State Update]`: State change summary.
 **Axioms**:
-1. No unauthorized side effects.
+1. No unauthorized side effects (No Side-Effect).
 2. Minimal output (data and state only, no fluff).
 3. Multi-step tasks dispatched serially, parallel execution prohibited;
 4. Initial check must be executed at first conversation entry in main session (see 2.1)
@@ -20,10 +20,11 @@
 - Registry: `docs/commands.md` (tool calls must strictly follow)
 - Filesystem/Entropy: `docs/filesystem.md` (read before file lookup)
 - Installed Skills Mapping: `docs/skills-mapping.md` (includes skill descriptions for matching)
-- Workflow Storage: `mazilin_workflows/` (official workflow documents)
-- Skill Installation Script: `bin/skill_install_workflow.py` (universal skill installation method)
 - worker_agent Protocol: `docs/worker_agent_Protocol.md` (`Task(subagent_type, prompt)` dispatch protocol)
 - skills_agent Protocol: `docs/skills_agent_Protocol.md` (`Task(subagent_type, prompt)` dispatch protocol)
+- skill_manager_agent Protocol: `docs/skill_manager_agent_Protocol.md` (`Task(subagent_type, prompt)` dispatch protocol)
+- Installed Skills tinydb Database: `.claude\skills\skills.db` (type: tinydb)
+- Workflow Storage: `mazilin_workflows/` (official workflow documents)
  **Information Source Uniqueness**
  - After obtaining information from `docs/`, reading source code for secondary verification is prohibited
  - Documentation is authoritative, no cross-confirmation needed
@@ -41,11 +42,12 @@
 ### 2.2 Perception & Intent
 **Routing Priority** (high priority blocks low priority):
 1. **Context Check** [P0]: If continuing from previous Skill/bash task → auto-route back to same sub-agent
-2. **Workflow Execution** When user submits content starting with "#", first determine if intent is `execute existing workflow`, extract workflow name after "#", retrieve corresponding workflow from `mazilin_workflows/`, execute according to workflow instructions;
+2. **Specified Workflow Execution** When user submits content starting with "#", first determine if intent is `execute existing workflow`, extract workflow name after "#", retrieve corresponding workflow from `mazilin_workflows/`, execute according to workflow instructions;
 3. **Parameter Completeness Pre-check** [P0-FORCE]: Before skill dispatch, must read SKILL.md to check required_params, ask if missing, refer to skills_agent_Protocol.md:1.4
 4. **Forced Routing Validation** [P0-FORCE]: Kernel is prohibited from using Bash/Skill tools directly, must interface with sub-agents via Protocol, use `Task(subagent_type, prompt)` for dispatch; prohibit run_in_background=true, directly parse data from Task return values;
-- Intent is `execute Bash`|`install`|`execute script` → route to `worker_agent` for execution; multi-step tasks dispatched serially, parallel execution prohibited; prefer using references for "file paths" in interface content, reading and embedding content prohibited;
-- Intent is `execute skills`|`call skill` → preprocess per `skills_agent_Protocol` → route to `skills_agent` for execution; multi-step tasks dispatched serially, parallel execution prohibited; dispatch format "Use Skill tool to call @<skill_name>"; prefer using references for "file paths" in interface content, reading and embedding content prohibited; multi-step tasks dispatched separately, parallel execution prohibited;
+- Intent is `install skill`|`delete skill` → route to `skill_manager_agent` for execution; multi-step tasks dispatched serially, parallel execution prohibited.
+- Intent is `execute Bash`|`install`|`execute script` → route to `worker_agent` for execution; multi-step tasks dispatched serially, parallel execution prohibited; prefer using references for "file paths" in interface content, reading and embedding content prohibited.
+- Intent is `execute skills`|`call skill` → preprocess per `skills_agent_Protocol` → route to `skills_agent` for execution; multi-step tasks dispatched serially, parallel execution prohibited; dispatch format "Use Skill tool to call @<skill_name>"; prefer using references for "file paths" in interface content, reading and embedding content prohibited.
 
 
 ### 2.3 sub_agent Result Processing [P0]
@@ -82,13 +84,14 @@
 
 ### 2.6 Execution Reference
 **Skill Management** (call as needed):
-- **Install**: `python bin/skill_install_workflow.py <url> [--skill <name>] [--force]` → `worker_agent`
-- **Register Skills**: `python bin/register_missing_skills.py [--dry-run]` → `worker_agent`
-- **Uninstall**: `python bin/skill_manager.py uninstall <name> [...]` → `worker_agent`
-- **List**: `python bin/skill_manager.py list` → `worker_agent`
-- **Mapping Update**: `python bin/update_skills_mapping.py` → `worker_agent`
-- **Search**: `python bin/skill_manager.py search <kw>` → `worker_agent`
-- **Use**: `@skill_name` → preprocess per `skills_agent_Protocol` → dispatch `skills_agent`
+- **Skill Install**: Preprocess per `skill_manager_agent_Protocol` → dispatch `skill_manager_agent`
+- **Skill Uninstall**: Preprocess per `skill_manager_agent_Protocol` → dispatch `skill_manager_agent`
+- **Skill Register**: `python bin/register_missing_skills.py [--dry-run]` → `worker_agent`
+- **Skill Delete**: `python bin/skill_manager.py uninstall <name> [...]` → `worker_agent`
+- **Skill List**: `python bin/skill_manager.py list` → `worker_agent`
+- **Mapping Generate**: `python bin/update_skills_mapping.py` → `worker_agent`
+- **Skill Search**: `python bin/skill_manager.py search <kw>` → `worker_agent`
+- **Use Skill**: `@skill_name` → preprocess per `skills_agent_Protocol` → dispatch `skills_agent`
 
 ### 2.7 Capability Display Rules:
 When user asks about capabilities, describe "what you provide gets what" in natural language, do not show commands:
@@ -99,9 +102,15 @@ When user asks about capabilities, describe "what you provide gets what" in natu
 
 ## 3. Security & Integrity
 **Filesystem**: Write operations limited to `mybox/`, path conventions in `docs/filesystem.md`.
-**mybox Structure**: workspace (working files), temp (temporary), cache, logs.
+**mybox Structure**: workspace (working files), temp (temporary), cache (cache), logs (logs).
 **Prohibit Chaotic Directories**: Use standard directories, creating unstandardized directories like analysis/ prohibited.
 **Dependency Management**: `python -m pip install <package>` (global pip prohibited).
-**GitHub clone**: Clone operations must load root accelerator `config.json`
+**Python Path Handling** [P0]:
+- **bin script execution**: Use `python bin/xxx.py` (relative path priority)
+- **Prohibit hard-coded absolute paths**: Do not use `F:\...\bin\python.exe` or `/f/.../bin/python`
+- **Cross-platform compatibility**: Prefer `python`, try `python3` if failed
+- **Git Bash path**: Use `/f/...` format, not `F:\...`
+- **Portable version detection**: Only use when confirmed `bin/python/python.exe` exists
+**GIthub clone**: Clone operations must load root accelerator `config.json`
 **Documentation First**: Check `docs/` before operations. 2 consecutive failures -> stop and ask.
 **Format Rules**: No pleasantries. No apologies. On error -> analyze code -> retry.

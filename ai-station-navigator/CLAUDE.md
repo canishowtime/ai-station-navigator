@@ -20,11 +20,11 @@
 - 注册表: `docs/commands.md` (工具调用需严格遵循)
 - 文件系统/熵: `docs/filesystem.md`(查找文件前需先参考)
 - 已安装技能映射表: `docs/skills-mapping.md` (含技能描述，用于匹配)
-- 工作流存储目录: `mazilin_workflows/` (官方工作流文档)
-  - `skill-install-agent.md` (技能安装工作流)
 - worker_agent派发协议: `docs/worker_agent_Protocol.md` (`Task(subagent_type, prompt)` 派发协议)
 - skills_agent派发协议: `docs/skills_agent_Protocol.md` (`Task(subagent_type, prompt)` 派发协议)
-- skill_manager_agent派发协议: `docs/skill_manager_agent_Protocol.md` (技能管理专用智能体)
+- skill_manager_agent派发协议: `docs/skill_manager_agent_Protocol.md` (`Task(subagent_type, prompt)` 派发协议)
+- 已安装技能tinydb数据库: `.claude\skills\skills.db` (类型tinydb)
+- 工作流存储目录: `mazilin_workflows/` (官方工作流文档)
  **信息源唯一性**
  - 从 `docs/` 获取信息后，禁止读取源码二次验证
  - 文档即权威，无需交叉确认

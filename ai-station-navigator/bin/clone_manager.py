@@ -665,6 +665,51 @@ class RemoteSkillAnalyzer:
 
         return False
 
+
+# =============================================================================
+# GitHub URL 解析工具
+# =============================================================================
+
+def _extract_github_info(github_url: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """从 GitHub URL 提取 author、repo 和子路径
+
+    支持格式:
+    - https://github.com/author/repo
+    - https://github.com/author/repo/tree/branch
+    - https://github.com/author/repo/tree/branch/skills/skill-name
+
+    Returns:
+        (author, repo, subpath)
+    """
+    from urllib.parse import urlparse
+
+    subpath = None
+
+    if "github.com" in github_url:
+        # 完整 URL 格式
+        parsed = urlparse(github_url)
+        path_parts = parsed.path.rstrip('/').split('/')
+
+        # 基本结构: /author/repo/...
+        if len(path_parts) >= 3 and path_parts[0] == '':
+            author = path_parts[1]
+            repo = path_parts[2]
+
+            # 检查是否有子路径 (tree/branch/skills/...)
+            if len(path_parts) > 3:
+                # 跳过 "tree" 和分支名
+                if len(path_parts) > 4 and path_parts[3] == "tree":
+                    # 子路径从分支名之后开始
+                    subpath = '/'.join(path_parts[5:]) if len(path_parts) > 5 else None
+                else:
+                    # 其他格式的子路径
+                    subpath = '/'.join(path_parts[3:]) if len(path_parts) > 3 else None
+
+            return author, repo, subpath
+
+    return None, None, None
+
+
 # =============================================================================
 # 仓库缓存管理器
 # =============================================================================
@@ -691,6 +736,19 @@ class RepoCacheManager:
         return cache_dir / ".meta.json"
 
     @staticmethod
+    def _get_last_cloned_file() -> Path:
+        """获取最后克隆的仓库标记文件路径"""
+        return TEMP_DIR / ".last_cloned_repo"
+
+    @staticmethod
+    def write_last_cloned(cache_dir_name: str) -> None:
+        """写入最后克隆的仓库标记（用于 scan-cache 定位）"""
+        last_cloned_file = RepoCacheManager._get_last_cloned_file()
+        TEMP_DIR.mkdir(parents=True, exist_ok=True)
+        with open(last_cloned_file, "w", encoding="utf-8") as f:
+            f.write(cache_dir_name)
+
+    @staticmethod
     def load_meta(cache_dir: Path) -> Optional[Dict]:
         """加载缓存元数据"""
         meta_file = RepoCacheManager._get_meta_file(cache_dir)
@@ -714,10 +772,21 @@ class RepoCacheManager:
     def get_or_clone(
         github_url: str,
         force_refresh: bool = False,
-        timeout: int = 300
+        timeout: int = 300,
+        user_input: Optional[str] = None,
+        requested_skill: Optional[str] = None,
+        install_params: Optional[Dict] = None
     ) -> Tuple[bool, Optional[Path], str]:
         """
         获取仓库（优先从缓存）
+
+        Args:
+            github_url: GitHub 仓库 URL
+            force_refresh: 是否强制刷新缓存
+            timeout: 超时时间（秒）
+            user_input: 用户原始输入的 URL/路径
+            requested_skill: 用户指定的 skill_name
+            install_params: 安装时的其他参数
 
         Returns:
             (成功, 仓库路径, 消息)
@@ -728,6 +797,26 @@ class RepoCacheManager:
         if cache_dir.exists() and not force_refresh:
             meta = RepoCacheManager.load_meta(cache_dir)
             if meta and meta.get("url") == github_url:
+                # 更新 meta（用户可能用不同参数再次请求）
+                updated_meta = meta.copy()
+                # 始终更新 user_input（保留最新的完整 URL）
+                updated_meta["user_input"] = user_input or github_url
+                # 如果没有指定 requested_skill，尝试从 user_input 提取
+                if requested_skill is None and user_input:
+                    _, subpath = FormatDetector.parse_github_subpath(user_input)
+                    if subpath:
+                        extracted_name = subpath.rstrip('/').split('/')[-1]
+                        if extracted_name:
+                            requested_skill = extracted_name
+                updated_meta["requested_skill"] = requested_skill or ""
+                if install_params is not None:
+                    updated_meta["install_params"] = install_params
+                updated_meta["last_accessed"] = datetime.now().isoformat()
+                RepoCacheManager.save_meta(cache_dir, updated_meta)
+
+                # 写入最后克隆的仓库标记
+                RepoCacheManager.write_last_cloned(cache_dir.name)
+
                 cached_time = meta.get("cached_at", "")
                 return True, cache_dir, f"使用缓存 (缓存于 {cached_time})"
 
@@ -737,18 +826,11 @@ class RepoCacheManager:
         # 如果旧缓存存在，先删除
         if cache_dir.exists():
             try:
-                subprocess.run(["rm", "-rf", str(cache_dir)], capture_output=True, timeout=10)
-            except:
-                pass
-            if cache_dir.exists():
-                warn(f"缓存清理失败，使用 shutil 强制重试: {cache_dir}")
-                time.sleep(0.5)
-                try:
-                    shutil.rmtree(cache_dir, ignore_errors=False)
-                except Exception as e:
-                    error(f"无法删除缓存目录，请手动删除后重试: {cache_dir}")
-                    error(f"错误信息: {e}")
-                    return False, None, f"缓存清理失败: {e}"
+                shutil.rmtree(cache_dir, ignore_errors=False)
+            except Exception as e:
+                error(f"无法删除缓存目录，请手动删除后重试: {cache_dir}")
+                error(f"错误信息: {e}")
+                return False, None, f"缓存清理失败: {e}"
 
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -758,13 +840,29 @@ class RepoCacheManager:
         if not clone_ok:
             return False, None, "仓库不存在或路径错误，请确认:\n1. 仓库 URL 是否正确\n2. 是否为子技能（尝试使用 --skill 参数）\n3. 查看映射表: docs/skills-mapping.md"
 
-        # 保存元数据
+        # 保存元数据（包含 author 和 repo 信息）
+        # 从 URL 解析 author 和 repo
+        author, repo, _ = _extract_github_info(github_url)
+
+        # 修复: 确保 user_input 优先使用传入值（保留原始完整 URL）
+        # 只有在完全为 None 时才回退到 github_url
+        final_user_input = user_input if user_input is not None else github_url
+
         meta = {
             "url": github_url,
+            "author": author or "",
+            "repo": repo or "",
             "cached_at": datetime.now().isoformat(),
-            "branch": "main"
+            "branch": "main",
+            "user_input": final_user_input,
+            "requested_skill": requested_skill or "",
+            "install_params": install_params or {},
+            "last_accessed": datetime.now().isoformat()
         }
         RepoCacheManager.save_meta(cache_dir, meta)
+
+        # 写入最后克隆的仓库标记
+        RepoCacheManager.write_last_cloned(cache_dir.name)
 
         return True, cache_dir, "缓存创建成功"
 
@@ -880,13 +978,10 @@ class GitHubHandler:
         if target_dir.exists():
             info(f"目标目录已存在，清理: {target_dir}")
             try:
-                subprocess.run(["rm", "-rf", str(target_dir)], capture_output=True, timeout=10)
-            except:
-                pass
-            if target_dir.exists():
-                warn(f"目录清理失败，使用 shutil 强制重试: {target_dir}")
-                time.sleep(0.5)
                 shutil.rmtree(target_dir, ignore_errors=False)
+            except Exception as e:
+                warn(f"目录清理失败: {target_dir}")
+                warn(f"错误信息: {e}")
 
         # 构建 git 命令
         cmd = ["git"]
@@ -1201,10 +1296,23 @@ def _process_github_source(
     skill_name: Optional[str] = None,
     use_cache: bool = True,
     force_refresh: bool = False,
-    temp_dir: Optional[Path] = None
+    temp_dir: Optional[Path] = None,
+    user_input: Optional[str] = None,
+    install_params: Optional[Dict] = None,
+    original_url: Optional[str] = None
 ) -> Tuple[List[Path], str]:
     """
     处理 GitHub 源（克隆 + 提取技能）
+
+    Args:
+        github_url: GitHub 仓库 URL (用于克隆)
+        skill_name: 可选，仅提取指定的技能名
+        use_cache: 是否使用缓存
+        force_refresh: 是否强制刷新缓存
+        temp_dir: 临时目录
+        user_input: 用户原始输入的 URL/路径 (已废弃，兼容保留)
+        install_params: 安装时的其他参数
+        original_url: 原始完整 URL (用于 meta 记录和 skill_name 提取)
 
     Returns:
         (技能目录列表, 消息)
@@ -1212,6 +1320,20 @@ def _process_github_source(
     if temp_dir is None:
         temp_dir = TEMP_DIR
         temp_dir.mkdir(parents=True, exist_ok=True)
+
+    # 统一使用 original_url (兼容旧的 user_input 参数名)
+    effective_input = original_url or user_input or github_url
+
+    # 修复: 如果 skill_name 为空，尝试从原始 URL 的 subpath 中提取
+    if not skill_name:
+        _, subpath = FormatDetector.parse_github_subpath(effective_input)
+        if subpath:
+            # 提取最后一部分作为 skill_name
+            # 例如: skills/baoyu-article-illustrator -> baoyu-article-illustrator
+            extracted_name = subpath.rstrip('/').split('/')[-1]
+            if extracted_name:
+                skill_name = extracted_name
+                info(f"从 URL 提取子技能名: {skill_name}")
 
     # 1. 技能仓库预检
     should_proceed, reason, sources = _dual_path_skill_check(github_url)
@@ -1233,9 +1355,13 @@ def _process_github_source(
     if use_cache:
         cache_ok, cache_dir, cache_msg = RepoCacheManager.get_or_clone(
             github_url,
-            force_refresh=force_refresh
+            force_refresh=force_refresh,
+            user_input=effective_input,  # 使用原始完整 URL
+            requested_skill=skill_name,
+            install_params=install_params
         )
         if cache_ok and cache_dir:
+            info(cache_msg)  # 输出缓存状态消息
             scan_dir = cache_dir
         else:
             return [], cache_msg
@@ -1312,11 +1438,25 @@ Examples:
         return 1
 
     if args.command == "clone":
+        # user_input 始终使用原始 URL (保留完整路径信息)
+        original_url = args.url
+        requested_skill = getattr(args, 'skill', None)
+        install_params = {
+            "force": getattr(args, 'force', False),
+            "no_cache": getattr(args, 'no_cache', False)
+        }
+
+        # 解析根仓库 URL (git clone 只支持根仓库)
+        repo_url, _ = FormatDetector.parse_github_subpath(original_url)
+
         skill_dirs, msg = _process_github_source(
-            args.url,
-            skill_name=getattr(args, 'skill', None),
-            use_cache=not getattr(args, 'no_cache', False),
-            force_refresh=getattr(args, 'force', False)
+            repo_url,  # 克隆使用根仓库 URL
+            skill_name=requested_skill,
+            use_cache=not install_params["no_cache"],
+            force_refresh=install_params["force"],
+            user_input=original_url,  # 兼容旧参数
+            install_params=install_params,
+            original_url=original_url  # 传递原始完整 URL
         )
 
         if not skill_dirs:
@@ -1327,6 +1467,16 @@ Examples:
         print("技能目录:")
         for skill_dir in skill_dirs:
             print(f"  - {skill_dir}")
+
+        # 打印缓存信息
+        cache_dir = RepoCacheManager._get_cache_dir(args.url)
+        if cache_dir.exists():
+            print("\n缓存信息:")
+            print(f"  缓存项目路径: {cache_dir}")
+            meta_file = RepoCacheManager._get_meta_file(cache_dir)
+            print(f"  .meta.json 文件路径: {meta_file}")
+            print("  提示: 用于安全扫描")
+
         return 0
 
     elif args.command == "list-cache":

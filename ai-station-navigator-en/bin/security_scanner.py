@@ -4,9 +4,9 @@ security_scanner.py - Agent Skills Security Scanner
 Wraps cisco-ai-skill-scanner, integrated into project path system
 
 Responsibilities:
-1. Phase 1 security scan (StaticAnalyzer + BehavioralAnalyzer)
-2. Batch scan (parallel support)
-3. Configuration management
+1. Phase 1 Security Scan (StaticAnalyzer + BehavioralAnalyzer)
+2. Batch Scan (with concurrency support)
+3. Configuration Management
 
 Note: Clone functionality moved to clone_manager.py
 
@@ -18,7 +18,7 @@ Original Copyright 2026 Cisco Systems, Inc.
 import sys
 import os
 
-# Windows UTF-8 compatibility (P0 - must be included in all scripts)
+# Windows UTF-8 兼容 (P0 - 所有脚本必须包含)
 if sys.platform == 'win32':
     try:
         sys.stdout.reconfigure(encoding='utf-8')
@@ -32,18 +32,19 @@ if sys.platform == 'win32':
 import json
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 import gc
+import time
 
 # =============================================================================
-# Patch Application Status Flag (lazy load)
+# Patch Application Status Flag (lazy loading)
 # =============================================================================
 
 _patches_applied = False
 
 
 def _ensure_patches_applied() -> None:
-    """Ensure patches are applied (lazy load, only executed on first use)"""
+    """Ensure patches are applied (lazy load, only on first use)"""
     global _patches_applied
     if not _patches_applied:
         _patch_skill_loader()
@@ -51,41 +52,41 @@ def _ensure_patches_applied() -> None:
 
 
 # =============================================================================
-# Frontmatter Fault-Tolerant Parsing Patch (Method A)
+# Frontmatter Forgiving Parse Patch (Plan A)
 # =============================================================================
 
 def _patch_skill_loader() -> bool:
     """
-    Fix skill_scanner frontmatter parsing issue
+    Fix skill_scanner frontmatter parsing issues
 
-    Problem: YAML format errors (e.g., key:value) cause entire scan to fail
-    Solution: Fault-tolerant parsing, use fallback to continue scanning code on failure
+    Issue: YAML format errors (e.g., key:value) cause entire scan to fail
+    Solution: Forgiving parse, fallback to continue code scan on failure
 
     Note: This is Monkey Patching. If cisco-ai-skill-scanner updates internal implementation,
-    the patch may become ineffective. Recommend periodically checking patch compatibility.
+    patch may become ineffective. Recommend checking patch compatibility periodically.
 
-    Long-term solution: Submit PR upstream to improve frontmatter fault tolerance.
+    Long-term: Submit PR upstream to improve frontmatter fault tolerance.
     """
     try:
         import re
         from skill_scanner.core.loader import SkillLoader
 
-        # Save original method
+        # 保存原始方法
         original_parse_skill_md = SkillLoader._parse_skill_md
 
         def _parse_frontmatter_forgiving(content: str):
-            """Fault-tolerant frontmatter parsing"""
+            """Forgiving frontmatter parsing"""
             try:
                 import frontmatter
                 post = frontmatter.loads(content)
                 return post.metadata, post.content, None
             except Exception as e:
-                # frontmatter parsing failed, manually separate
+                # frontmatter parse failed, manual split
                 metadata, body = _split_frontmatter_raw(content)
                 return metadata, body, str(e)
 
         def _split_frontmatter_raw(content: str):
-            """Manually separate frontmatter and body (fault-tolerant)"""
+            """Manual frontmatter and body split (forgiving)"""
             if not content.startswith("---"):
                 return {}, content
 
@@ -98,14 +99,14 @@ def _patch_skill_loader() -> bool:
             frontmatter_text = parts[1]
             body = parts[2].lstrip()
 
-            # Use regex fault-tolerant extraction (handle key:value format)
+            # Use regex for fault-tolerant extraction (handle key:value format)
             metadata = {}
             for line in frontmatter_text.strip().split('\n'):
                 line = line.strip()
                 if not line or line.startswith('#'):
                     continue
 
-                # Fault-tolerant match: key: value or key:value
+                # Forgiving match: key: value or key:value
                 match = re.match(r'^([\w-]+):\s*(.+)$', line)
                 if match:
                     key, value = match.groups()
@@ -120,7 +121,7 @@ def _patch_skill_loader() -> bool:
             return metadata, body
 
         def _extract_fallback_metadata(skill_md_path, content, partial_metadata):
-            """Infer metadata from filename and content"""
+            """Extract metadata from filename and content"""
             metadata = {}
 
             # Extract name from path
@@ -143,7 +144,7 @@ def _patch_skill_loader() -> bool:
             return metadata
 
         def patched_parse_skill_md(self, skill_md_path, *, lenient: bool = False):
-            """Fault-tolerant SKILL.md parsing
+            """Forgiving SKILL.md parsing
 
             Args:
                 skill_md_path: SKILL.md file path
@@ -156,13 +157,13 @@ def _patch_skill_loader() -> bool:
                 from skill_scanner.core.loader import SkillLoadError
                 raise SkillLoadError(f"Failed to read SKILL.md: {e}")
 
-            # Fault-tolerant frontmatter parsing
+            # Forgiving frontmatter parsing
             metadata, body, parse_error = _parse_frontmatter_forgiving(content)
 
-            # If parsing failed, use fallback
+            # If parse failed, use fallback
             if parse_error:
                 metadata = _extract_fallback_metadata(skill_md_path, content, metadata)
-                # Mark parsing error (but don't interrupt scan)
+                # Mark parse error (but don't interrupt scan)
                 metadata["_parse_error"] = parse_error
 
             # Validate required fields (use defaults)
@@ -223,6 +224,8 @@ def _patch_skill_loader() -> bool:
 
 BASE_DIR = Path(__file__).parent.parent
 SKILLS_DIR = BASE_DIR / ".claude" / "skills"
+CACHE_DIR = BASE_DIR / "mybox" / "cache" / "repos"
+TEMP_DIR = BASE_DIR / "mybox" / "temp"
 CONFIG_FILE = BASE_DIR / ".claude" / "config" / "security.yml"
 
 # Add bin directory to sys.path
@@ -255,26 +258,26 @@ def error(msg: str):
 
 
 # =============================================================================
-# Security Scan Interface
+# 安全扫描接口
 # =============================================================================
 
 def scan(skill_path: Path, config: Optional[Dict] = None) -> Dict[str, Any]:
     """Scan skill or directory at specified path
 
-    Use StaticAnalyzer + BehavioralAnalyzer combination (default mode)
+    Uses StaticAnalyzer + BehavioralAnalyzer combination (default mode)
     - No network requests required
     - No API Key required
     - Detection coverage ~95%
-    - Supports scanning ordinary directories without SKILL.md
+    - Supports scanning normal directories without SKILL.md
 
     Args:
         skill_path: Skill directory path or any code directory
-        config: Optional config dictionary (loads default if not provided)
+        config: Optional config dict (loads default if not provided)
 
     Returns:
         Scan result dictionary
     """
-    # Ensure patches are applied (lazy load)
+    # 确保补丁已应用（懒加载）
     _ensure_patches_applied()
 
     try:
@@ -289,7 +292,7 @@ def scan(skill_path: Path, config: Optional[Dict] = None) -> Dict[str, Any]:
             "threats": []
         }
 
-    # Load config
+    # 加载配置
     if config is None:
         config = load_config()
 
@@ -297,7 +300,7 @@ def scan(skill_path: Path, config: Optional[Dict] = None) -> Dict[str, Any]:
     use_static = engines.get("static", True)
     use_behavioral = engines.get("behavioral", True)
 
-    # Build analyzer list
+    # 构建分析器列表
     analyzers = []
     if use_static:
         analyzers.append(StaticAnalyzer())
@@ -313,10 +316,10 @@ def scan(skill_path: Path, config: Optional[Dict] = None) -> Dict[str, Any]:
             "threats": []
         }
 
-    # Check if SKILL.md exists
+    # 检查是否存在 SKILL.md
     has_skill_md = (Path(skill_path) / "SKILL.md").exists()
 
-    # Execute scan
+    # 执行扫描
     try:
         import time
         start_time = time.time()
@@ -325,21 +328,21 @@ def scan(skill_path: Path, config: Optional[Dict] = None) -> Dict[str, Any]:
         analyzers_used = []
 
         if has_skill_md:
-            # Use SkillScanner (skill format)
+            # 使用 SkillScanner（技能格式）
             scanner = SkillScanner(analyzers=analyzers)
             result = scanner.scan_skill(Path(skill_path))
             all_findings = result.findings
             analyzers_used = result.analyzers_used
             scan_duration = result.scan_duration_seconds
         else:
-            # Call analyzers directly (no SKILL.md)
+            # 直接调用分析器（无 SKILL.md）
             for analyzer in analyzers:
                 try:
                     findings = analyzer.analyze(Path(skill_path))
                     all_findings.extend(findings)
                     analyzers_used.append(analyzer.get_name())
                 except Exception as e:
-                    warn(f"Analyzer {analyzer.get_name()} execution failed: {e}")
+                    warn(f"分析器 {analyzer.get_name()} 执行失败: {e}")
             scan_duration = time.time() - start_time
 
         # Extract threat information (including context)
@@ -375,7 +378,7 @@ def scan(skill_path: Path, config: Optional[Dict] = None) -> Dict[str, Any]:
                 "snippet": f.snippet
             }
 
-            # Add full context (only when file path exists)
+            # 添加完整上下文（仅当文件路径存在时）
             if f.file_path and f.line_number:
                 threat_data["context"] = extract_context(f.file_path, f.line_number)
 
@@ -403,13 +406,16 @@ def scan(skill_path: Path, config: Optional[Dict] = None) -> Dict[str, Any]:
         }
 
 
-def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None) -> Dict[str, Dict]:
+def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None,
+               timeout: int = 60, show_progress: bool = True) -> Dict[str, Dict]:
     """
-    Batch scan skills (supports parallelism)
+    Batch scan skills (supports concurrency, timeout, and progress feedback)
 
     Args:
         skill_dirs: List of skill directories
-        config: Optional config
+        config: Optional configuration
+        timeout: Per-skill timeout (seconds), default 5 minutes
+        show_progress: Whether to show progress info
 
     Returns:
         {skill_name: scan_result, ...}
@@ -442,11 +448,20 @@ def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None) -> Dict[st
     info(f"[SCAN] Batch parallel scan {len(skill_dirs)} skills (4 threads)...")
 
     batch_size = 8
+    total_batches = (len(skill_dirs) + batch_size - 1) // batch_size
+    completed_count = 0
+    start_time = time.time()
+
     for i in range(0, len(skill_dirs), batch_size):
         batch = skill_dirs[i:i + batch_size]
         batch_num = i // batch_size + 1
-        total_batches = (len(skill_dirs) + batch_size - 1) // batch_size
-        info(f"  Batch {batch_num}/{total_batches}: Scanning {len(batch)} skills...")
+
+        if show_progress:
+            elapsed = time.time() - start_time
+            avg_time = elapsed / completed_count if completed_count > 0 else 0
+            remaining = avg_time * (len(skill_dirs) - completed_count) if avg_time > 0 else 0
+            info(f"  Batch {batch_num}/{total_batches} ({completed_count}/{len(skill_dirs)} completed, "
+                 f"elapsed: {elapsed:.1f}s, estimated remaining: {remaining:.1f}s)")
 
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = {
@@ -454,10 +469,27 @@ def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None) -> Dict[st
                 for skill_dir in batch
             }
 
-            for future in futures:
+            for future in as_completed(futures):
                 skill_dir = futures[future]
                 try:
-                    scan_results[skill_dir.name] = future.result()
+                    result = future.result(timeout=timeout)
+                    scan_results[skill_dir.name] = result
+                    if show_progress:
+                        completed_count += 1
+                        status_icon = "[OK]" if result["status"] == "success" else "[!]"
+                        print(f"    {completed_count}/{len(skill_dirs)} {skill_dir.name} {status_icon} "
+                              f"{result['severity']} ({result['findings_count']} threats)")
+                except TimeoutError:
+                    scan_results[skill_dir.name] = {
+                        "status": "error",
+                        "error": f"Scan timeout (>{timeout}s)",
+                        "severity": "UNKNOWN",
+                        "findings_count": 0,
+                        "threats": []
+                    }
+                    if show_progress:
+                        completed_count += 1
+                        print(f"    {completed_count}/{len(skill_dirs)} {skill_dir.name} [TIMEOUT]")
                 except Exception as e:
                     scan_results[skill_dir.name] = {
                         "status": "error",
@@ -466,6 +498,9 @@ def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None) -> Dict[st
                         "findings_count": 0,
                         "threats": []
                     }
+                    if show_progress:
+                        completed_count += 1
+                        print(f"    {completed_count}/{len(skill_dirs)} {skill_dir.name} [ERROR] {str(e)[:50]}")
 
         # Force garbage collection
         gc.collect()
@@ -474,7 +509,7 @@ def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None) -> Dict[st
 
 
 def is_safe(result: Dict[str, Any], allowed_severity: List[str]) -> bool:
-    """Check if scan result is within allowed security levels"""
+    """Check if scan result is within allowed severity levels"""
     severity = result.get("severity", "UNKNOWN")
     return severity in allowed_severity
 
@@ -488,7 +523,7 @@ def load_config() -> Dict[str, Any]:
         except Exception:
             pass
 
-    # Default config
+    # Default configuration
     return {
         "scan_enabled": True,
         "scan_on_install": True,
@@ -504,11 +539,11 @@ def load_config() -> Dict[str, Any]:
 
 
 # =============================================================================
-# CLI Entry
+# CLI 入口
 # =============================================================================
 
 def main():
-    """CLI entry"""
+    """CLI entry point"""
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -516,31 +551,31 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Scan specified skill
-  python bin/security_scanner.py scan my-skill
+  # Scan new skills in cache directory (based on clone script output)
+  python bin/security_scanner.py scan-cache
 
-  # Scan all installed skills
-  python bin/security_scanner.py scan-all
+  # Scan specified path (cache directory only)
+  python bin/security_scanner.py scan <cache_path>
 
-  # View current config
+  # View current configuration
   python bin/security_scanner.py config
 
-Note: Clone functionality moved to clone_manager.py
+SECURITY: Scan limited to mybox/cache/repos/ directory, scanning installed skills prohibited.
         """
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    # scan command
-    scan_parser = subparsers.add_parser("scan", help="Scan specified skill")
-    scan_parser.add_argument("target", help="Skill name or path")
+    # scan command (cache directory only)
+    scan_parser = subparsers.add_parser("scan", help="Scan specified path (cache directory only)")
+    scan_parser.add_argument("target", help="Skill path (must be under mybox/cache/repos/)")
     scan_parser.add_argument("--json", action="store_true", help="Output JSON format (for script parsing)")
 
-    # scan-all command
-    subparsers.add_parser("scan-all", help="Scan all installed skills")
+    # scan-cache command (scan new skills from clone script output)
+    subparsers.add_parser("scan-cache", help="Scan new skills in cache directory (based on clone script output)")
 
     # config command
-    subparsers.add_parser("config", help="View current config")
+    subparsers.add_parser("config", help="View current configuration")
 
     args = parser.parse_args()
 
@@ -548,7 +583,7 @@ Note: Clone functionality moved to clone_manager.py
         parser.print_help()
         return 1
 
-    # Load config
+    # Load configuration
     config = load_config()
 
     if args.command == "config":
@@ -560,13 +595,25 @@ Note: Clone functionality moved to clone_manager.py
         target = args.target
         skill_path = None
 
-        if not Path(target).is_absolute():
-            skill_path = SKILLS_DIR / target
-            if not skill_path.exists():
-                print(f"Error: Skill not found: {target}")
-                return 1
-        else:
+        if Path(target).is_absolute():
+            # Absolute path: use directly
             skill_path = Path(target)
+        else:
+            # Relative path: resolve from BASE_DIR
+            skill_path = BASE_DIR / target
+
+        # Path security verification: must be under cache directory
+        try:
+            skill_path.resolve().relative_to(CACHE_DIR.resolve())
+        except ValueError:
+            print(f"Error: Security restriction - scan limited to cache directory (mybox/cache/repos/)")
+            print(f"Target path: {skill_path.resolve()}")
+            print(f"Allowed scope: {CACHE_DIR.resolve()}")
+            return 1
+
+        if not skill_path.exists():
+            print(f"Error: Path does not exist: {skill_path.resolve()}")
+            return 1
 
         result = scan(skill_path, config)
 
@@ -597,39 +644,90 @@ Note: Clone functionality moved to clone_manager.py
 
         return 0 if result["status"] == "success" else 1
 
-    elif args.command == "scan-all":
-        if not SKILLS_DIR.exists():
-            print("Error: Skills directory does not exist")
+    elif args.command == "scan-cache":
+        # Scan new skills in cache directory (based on clone script output)
+        if not CACHE_DIR.exists():
+            print("Error: Cache directory does not exist")
             return 1
 
-        skills = [d for d in SKILLS_DIR.iterdir() if d.is_dir()]
+        # Prioritize reading .last_cloned_repo file (written by clone script)
+        last_cloned_file = TEMP_DIR / ".last_cloned_repo"
+        scan_dirs = []
 
-        if not skills:
-            print("No installed skills")
+        if last_cloned_file.exists():
+            try:
+                with open(last_cloned_file, "r", encoding="utf-8") as f:
+                    repo_name = f.read().strip()
+                target_repo = CACHE_DIR / repo_name
+                if target_repo.exists() and target_repo.is_dir():
+                    scan_dirs = [target_repo]
+                    info(f"[SCAN] Scanning latest cloned repo: {repo_name}")
+                else:
+                    warn(f"Repository specified by .last_cloned_repo does not exist: {repo_name}")
+                    scan_dirs = [d for d in CACHE_DIR.iterdir() if d.is_dir() and d.name != ".gitkeep"]
+            except Exception as e:
+                warn(f"Failed to read .last_cloned_repo: {e}")
+                scan_dirs = [d for d in CACHE_DIR.iterdir() if d.is_dir() and d.name != ".gitkeep"]
+        else:
+            # File not found: scan all (backward compatibility)
+            info("[SCAN] .last_cloned_repo marker not found, scanning all cache directories")
+            scan_dirs = [d for d in CACHE_DIR.iterdir() if d.is_dir() and d.name != ".gitkeep"]
+
+        # Find skill subdirectories
+        cache_skills = []
+        for repo_dir in scan_dirs:
+            # Find skill directories under repo (containing SKILL.md)
+            for skill_dir in repo_dir.rglob("*"):
+                if skill_dir.is_dir() and (skill_dir / "SKILL.md").exists():
+                    cache_skills.append(skill_dir)
+
+        if not cache_skills:
+            print("No skills found in cache directory")
             return 0
 
-        print(f"Scanning {len(skills)} installed skills...\n")
+        print(f"Scanning {len(cache_skills)} skills in cache directory...\n")
 
+        # Use batch concurrent scan
+        scan_results = batch_scan(cache_skills, config, timeout=60, show_progress=True)
+
+        # Summarize results
         all_safe = True
         threatened_skills = []
 
-        for skill_dir in skills:
-            print(f"Scanning: {skill_dir.name}")
-            result = scan(skill_dir, config)
-
-            status_icon = "[OK]" if result["status"] == "success" else "[!]"
-            print(f"  {status_icon} {result['severity']} - {result['findings_count']} threats")
-
+        for skill_dir, result in scan_results.items():
             if result["status"] != "success":
                 all_safe = False
-                threatened_skills.append((skill_dir.name, result))
-            print()
+                threatened_skills.append((skill_dir, result))
+            else:
+                status_icon = "[OK]"
+                print(f"  {status_icon} {skill_dir}: {result['severity']}")
+
+        print()
+
+        # Display threat details
+        if threatened_skills:
+            print(f"Found {len(threatened_skills)} threatened skills:")
+            for skill_name, result in threatened_skills:
+                status = result.get("status", "unknown")
+                severity = result.get("severity", "UNKNOWN")
+                count = result.get("findings_count", 0)
+                error = result.get("error", "")
+
+                if error:
+                    print(f"  [!] {skill_name}: {error}")
+                else:
+                    print(f"  [!] {skill_name}: {severity} ({count} threats)")
+
+                    # Display threat list
+                    for threat in result.get("threats", [])[:3]:
+                        print(f"      - [{threat['severity']}] {threat['title']}")
+                    if len(result.get("threats", [])) > 3:
+                        print(f"      ... and {len(result.get('threats', [])) - 3} more")
 
         if all_safe:
-            print("All skills passed security scan")
+            print("All skills passed scan")
             return 0
         else:
-            print(f"Found {len(threatened_skills)} threat skills")
             return 1
 
     return 0

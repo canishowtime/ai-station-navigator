@@ -280,9 +280,16 @@ def install_source_package(zip_path, site_packages):
                 if len(parts) > 1:
                     top_dirs.add(parts[0])
 
-            # 确定前缀
+            # 确定前缀：检测单一根目录是否为 Python 包（含 __init__.py）
+            # 若是则保留目录结构，否则剥离（兼容分发包结构）
             if len(top_dirs) == 1:
-                prefix = list(top_dirs)[0] + '/'
+                root_dir = list(top_dirs)[0]
+                # 检查根目录内是否含 __init__.py（Python 包标记）
+                has_init = any(
+                    name == f"{root_dir}/__init__.py"
+                    for name in zf.namelist()
+                )
+                prefix = '' if has_init else (root_dir + '/')
             else:
                 prefix = ''
 

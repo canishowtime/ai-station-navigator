@@ -107,7 +107,7 @@ def append(file_path: str, content: str, newline: bool = True) -> None:
             try:
                 existing = read_file(file_path)
                 needs_newline = existing and not existing.endswith('\n')
-            except:
+            except (OSError, IOError):
                 needs_newline = False
 
         with open(file_path, 'a', encoding='utf-8') as f:

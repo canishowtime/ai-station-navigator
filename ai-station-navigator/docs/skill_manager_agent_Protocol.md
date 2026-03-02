@@ -12,38 +12,26 @@
 Task(
   "skill_manager_agent",
   "<3-5词任务摘要>",
-  "<自然语言指令>",
-  {
-    url?: string,           # GitHub URL (安装时)
-    skill_name?: string,    # 子技能名 (可选)
-    force?: boolean,        # 强制覆盖 (可选)
-    skill_names?: string[], # 技能列表 (删除时)
-  }
+  "<自然语言指令，包含必要参数>"
 )
 ```
 
 ### 调用示例
 ```yaml
-# 安装技能
+# 安装技能 - 传递原始 URL
 Task("skill_manager_agent", "安装技能", "从 https://github.com/user/repo 安装技能")
 
-# 安装指定子技能
-Task("skill_manager_agent", "安装技能", "安装 repo 中的 skill-a", {
-  url: "https://github.com/user/repo",
-  skill_name: "skill-a"
-})
+# 安装指定子技能 - 使用完整子路径 URL（脚本自动解析）
+Task("skill_manager_agent", "安装技能", "从 https://github.com/user/repo/tree/main/skills/skill-a 安装")
 
-# 删除技能
+# 删除技能 - 按名称
 Task("skill_manager_agent", "删除技能", "删除技能 skill-a skill-b")
 
+# 删除技能 - 按仓库 URL
+Task("skill_manager_agent", "删除技能", "删除 https://github.com/user/repo")
+
 # 恢复安装 (pending 后)
-Task("skill_manager_agent", "继续安装", "根据决策继续", {
-  mode: "resume",
-  decisions: {"skill-b": "keep", "skill-c": "uninstall"},
-  safe_skills: ["skill-a"],
-  skip_scan: true,
-  cached_paths: {"skill-a": "路径", "skill-b": "路径"}
-})
+Task("skill_manager_agent", "继续安装", "resume: keep skill-b, uninstall skill-c")
 ```
 
 ---
@@ -96,7 +84,8 @@ Task("skill_manager_agent", "继续安装", "根据决策继续", {
     cached_paths: {
       "skill-a": "mybox/cache/.../skill-a",
       "skill-b": "mybox/cache/.../skill-b"
-    }
+    },
+    meta_json: "mybox/cache/.../.meta.json"  # 用户原始需求记录
   }
 ```
 
@@ -171,11 +160,3 @@ Task("skill_manager_agent", "继续安装", "根据决策继续", {
 | `HIGH` | **必须审核** |
 | `CRITICAL` | **强烈建议卸载** |
 
----
-
-## 版本历史
-
-| 版本 | 变更内容 |
-|------|----------|
-| v2.0 | 精简为核心三要素，移除实现细节 |
-| v1.2 | 包含完整功能规范 (已迁移至 Agent 配置) |

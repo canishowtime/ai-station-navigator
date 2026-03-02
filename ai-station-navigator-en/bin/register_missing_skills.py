@@ -148,7 +148,7 @@ class SkillsRegistry:
 
             for skill_name in skills_to_register:
                 try:
-                    result = SkillInstaller._sync_skill_to_db(skill_name, db, Skill)
+                    result = SkillInstaller._sync_skill_to_db(skill_name, db=db, Skill=Skill)
                     if result:
                         self.registered_count += 1
                         print(f"  ✓ {skill_name}")

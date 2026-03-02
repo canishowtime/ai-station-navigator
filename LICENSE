@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2025-2026 [Mazilin (canishowtime)]
+Copyright (c) 2025-2026 Mazilin (canishowtime)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,72 +22,42 @@ SOFTWARE.
 
 ---
 
-## Third-Party Skills Licenses
+## Third-Party Licenses
 
-This project incorporates the following third-party Claude Code skills. Each skill
-is licensed under its respective terms:
+This project incorporates third-party software licensed under:
 
-| GitHub Project | License | Skills Count |
-|:---|:---|:---:|
-| **coreyhaines31/marketingskills** | MIT License | 20 |
-| **ComposioHQ/awesome-claude-skills** | Apache License 2.0 | 11 |
-| **obra/superpowers** | MIT License | 2 |
-| **JimLiu/baoyu-skills** | MIT License | 2 |
-| **ClickHouse/agent-skills** | Apache License 2.0 | 1 |
-| **ginobefun/deep-reading-analyst-skill** | MIT License | 1 |
-| **op7418/Humanizer-zh** | MIT License | 1 |
+### MIT License
 
-### MIT License Skills
+- pip (https://github.com/pypa/pip)
+- TinyDB (https://github.com/msiemens/tinydb)
+- PyYAML (https://github.com/yaml/pyyaml)
+- python-frontmatter (https://github.com/eyeseast/python-frontmatter)
+- confusable_homoglyphs (https://github.com/vatlab/confusable-homoglyphs)
+- h11 (https://github.com/python-hyper/h11)
+- anyio (https://github.com/agronholm/anyio)
 
-The following skills are licensed under the MIT License:
+### Apache License 2.0
 
-- coreyhaines31/marketingskills: https://github.com/coreyhaines31/marketingskills
-- obra/superpowers: https://github.com/obra/superpowers
-- JimLiu/baoyu-skills: https://github.com/JimLiu/baoyu-skills
-- ginobefun/deep-reading-analyst-skill: https://github.com/ginobefun/deep-reading-analyst-skill
-- op7418/Humanizer-zh: https://github.com/op7418/Humanizer-zh
+- yara-x (https://github.com/VirusTotal/yara-x)
+- cisco-ai-skill-scanner (https://github.com/cisco-ai-defense/skill-scanner)
 
-### Apache License 2.0 Skills
+### BSD-3-Clause
 
-The following skills are licensed under the Apache License 2.0:
+- httpx (https://github.com/encode/httpx)
+- httpcore (https://github.com/encode/httpcore)
+- idna (https://github.com/kjd/idna)
 
-- ComposioHQ/awesome-claude-skills: https://github.com/ComposioHQ/awesome-claude-skills
-  - Note: Individual skills within this collection may have different licenses.
-    Refer to each skill's directory for specific licensing information.
-- ClickHouse/agent-skills: https://github.com/ClickHouse/agent-skills
+### MPL-2.0 (Mozilla Public License)
 
-### Full License Texts
+- certifi (https://github.com/certifi/python-certifi)
 
-#### MIT License
+### Python Software Foundation License
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+- typing_extensions (https://github.com/python/typing_extensions)
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-#### Apache License 2.0
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+For complete license texts:
+- MIT: https://opensource.org/licenses/MIT
+- Apache 2.0: https://www.apache.org/licenses/LICENSE-2.0
+- BSD-3-Clause: https://opensource.org/licenses/BSD-3-Clause
+- MPL-2.0: https://www.mozilla.org/en-US/MPL/2.0/
+- Or see CREDITS.md for detailed third-party information

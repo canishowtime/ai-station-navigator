@@ -1,68 +1,56 @@
 # Skill Manager Agent Dispatch Protocol v2.0
 
-> **Positioning**: Communication contract between Kernel ↔ Skill Manager Agent
-> **Principle**: Define interfaces only, not implementation
+> **Positioning**: Kernel ↔ Skill Manager Agent Communication Contract
+> **Principle**: Define interfaces only, do not describe implementation
 
 ---
 
-## 1. How to Dispatch
+## 1. How to Call
 
 ### Task Signature
 ```
 Task(
   "skill_manager_agent",
   "<3-5 word task summary>",
-  "<natural language instruction>",
-  {
-    url?: string,           # GitHub URL (when installing)
-    skill_name?: string,    # Sub-skill name (optional)
-    force?: boolean,        # Force override (optional)
-    skill_names?: string[], # Skill list (when uninstalling)
-  }
+  "<Natural language instruction with necessary parameters>"
 )
 ```
 
-### Dispatch Examples
+### Call Examples
 ```yaml
-# Install skill
-Task("skill_manager_agent", "Install skill", "Install skill from https://github.com/user/repo")
+# Install skill - Pass original URL
+Task("skill_manager_agent", "Install skill", "Install from https://github.com/user/repo")
 
-# Install specified sub-skill
-Task("skill_manager_agent", "Install skill", "Install skill-a from repo", {
-  url: "https://github.com/user/repo",
-  skill_name: "skill-a"
-})
+# Install specific sub-skill - Use full subpath URL (script auto-parses)
+Task("skill_manager_agent", "Install skill", "Install from https://github.com/user/repo/tree/main/skills/skill-a")
 
-# Delete skill
+# Delete skill - By name
 Task("skill_manager_agent", "Delete skill", "Delete skills skill-a skill-b")
 
+# Delete skill - By repo URL
+Task("skill_manager_agent", "Delete skill", "Delete https://github.com/user/repo")
+
 # Resume installation (after pending)
-Task("skill_manager_agent", "Continue installation", "Continue based on decision", {
-  mode: "resume",
-  decisions: {"skill-b": "keep", "skill-c": "uninstall"},
-  safe_skills: ["skill-a"],
-  skip_scan: true,
-  cached_paths: {"skill-a": "path", "skill-b": "path"}
-})
+Task("skill_manager_agent", "Continue installation", "resume: keep skill-b, uninstall skill-c")
 ```
 
 ---
 
 ## 2. What Returns
 
-### Status Code Definitions
-| Status | Meaning | data Field |
+### Status Code Definition
+| Status | Meaning | data Fields |
 |:---|:---|:---|
-| `success` | Completed | `installed[]`, `uninstalled[]`, `skipped[]` |
-| `pending` | Awaiting review | `threatened_skills[]`, `safe_skills[]`, `cached_paths{}` |
-| `partial` | Partially successful | `installed[]`, `failed[]`, `errors{}` |
+| `success` | Complete | `installed[]`, `uninstalled[]`, `skipped[]` |
+| `pending` | Waiting review | `threatened_skills[]`, `safe_skills[]`, `cached_paths{}` |
+| `partial` | Partial success | `installed[]`, `failed[]`, `errors{}` |
 | `error` | Failed | `type`, `reason`, `recoverable` |
 
 ### Return Examples
 
-**Installation Success**:
+**Install Success**:
 ```yaml
-✅ skill_manager_agent installation complete: 2/3 successful
+check-icon skill_manager_agent installation complete: 2/3 succeeded
   state: success
   data: {
     installed: ["skill-a", "skill-b"],
@@ -71,9 +59,9 @@ Task("skill_manager_agent", "Continue installation", "Continue based on decision
   }
 ```
 
-**Awaiting Review**:
+**Waiting Review**:
 ```yaml
-⏸️ skill_manager_agent awaiting review: 1 skill requires decision
+pause-icon skill_manager_agent waiting review: 1 skill needs decision
   state: pending
   data: {
     threatened_skills: [
@@ -96,13 +84,14 @@ Task("skill_manager_agent", "Continue installation", "Continue based on decision
     cached_paths: {
       "skill-a": "mybox/cache/.../skill-a",
       "skill-b": "mybox/cache/.../skill-b"
-    }
+    },
+    meta_json: "mybox/cache/.../.meta.json"  # User original requirement record
   }
 ```
 
-**Deletion Success**:
+**Delete Success**:
 ```yaml
-✅ skill_manager_agent deletion complete: 2 skills
+check-icon skill_manager_agent deletion complete: 2 skills
   state: success
   data: {
     uninstalled: ["skill-a", "skill-b"],
@@ -112,7 +101,7 @@ Task("skill_manager_agent", "Continue installation", "Continue based on decision
 
 **Error**:
 ```yaml
-❌ skill_manager_agent CloneFailed: Repository not found
+x-icon skill_manager_agent CloneFailed: Repository not found
   state: error
   data: {
     type: "CloneFailed",
@@ -128,36 +117,36 @@ Task("skill_manager_agent", "Continue installation", "Continue based on decision
 
 ### 3.1 Error Handling
 
-| Error Type | recoverable | Handling Recommendation |
+| Error Type | recoverable | Handling Suggestion |
 |:---|---:|:---|
-| `CloneFailed` | false | Prompt to check URL and permissions |
-| `ScanFailed` | true | Skip scan and continue installation |
-| `ModuleNotFound` | true | Guide to install dependencies (pip install) |
+| `CloneFailed` | false | Prompt check URL and permissions |
+| `ScanFailed` | true | Skip scan, continue installation |
+| `ModuleNotFound` | true | Guide install dependencies (pip install) |
 | `InvalidSkill` | false | Skip this skill |
-| `InstallFailed` | null | Judge based on specific error |
+| `InstallFailed` | null | Judge by specific error |
 
 ### 3.2 Pending Recovery Flow
 
 ```
 ┌─────────────────────────────────────────┐
-│  First call                              │
+│  First Call                              │
 ├─────────────────────────────────────────┤
-│  Kernel → Agent: Install skill          │
-│  Agent → Kernel: pending + threat details│
-│    + cached_paths (for recovery)        │
+│  Kernel → Agent: Install skill           │
+│  Agent → Kernel: pending + threat details │
+│    + cached_paths (for recovery)         │
 └─────────────────────────────────────────┘
-              ↓ User decision
+              ↓ User Decision
 ┌─────────────────────────────────────────┐
-│  Second call (recovery)                 │
+│  Second Call (Recovery)                  │
 ├─────────────────────────────────────────┤
-│  Kernel → Agent: resume task            │
-│    - mode: "resume"                     │
+│  Kernel → Agent: resume task             │
+│    - mode: "resume"                      │
 │    - decisions: {skill: "keep/uninstall"}│
-│    - safe_skills: [...]                │
-│    - cached_paths: {...}               │
-│    - skip_scan: true                   │
+│    - safe_skills: [...]                 │
+│    - cached_paths: {...}                │
+│    - skip_scan: true                    │
 │  Agent: Skip clone/scan, install directly│
-│  Agent → Kernel: success result         │
+│  Agent → Kernel: success result          │
 └─────────────────────────────────────────┘
 ```
 
@@ -167,15 +156,6 @@ Task("skill_manager_agent", "Continue installation", "Continue based on decision
 |:---|:---|
 | `SAFE` | Install directly |
 | `LOW` | Install directly |
-| `MEDIUM` | **Review required** |
-| `HIGH` | **Review required** |
+| `MEDIUM` | **Must review** |
+| `HIGH` | **Must review** |
 | `CRITICAL` | **Strongly recommend uninstall** |
-
----
-
-## Version History
-
-| Version | Changes |
-|------|----------|
-| v2.0 | Streamlined to core three elements, removed implementation details |
-| v1.2 | Included complete functional specification (migrated to Agent config) |

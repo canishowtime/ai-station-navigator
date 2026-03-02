@@ -6,7 +6,7 @@ import json
 import sys
 import os
 
-# Windows UTF-8 compatibility (P0 - must be included in all scripts)
+# Windows UTF-8 Compatibility (P0 - All scripts must include)
 if sys.platform == 'win32':
     try:
         sys.stdout.reconfigure(encoding='utf-8')
@@ -40,7 +40,7 @@ OFFLINE_PACKAGES = BASE_DIR / "mybox" / "cache" / "packages"
 # Dependency Configuration
 # =============================================================================
 
-# PyPI core dependencies (module_name -> package_name)
+# PyPI Core Dependencies (module name -> package name)
 # pip must be first as it's used to install other packages
 CORE_DEPS = [
     ('pip', 'pip'),
@@ -59,7 +59,7 @@ CORE_DEPS = [
     ('typing_extensions', 'typing_extensions'),
 ]
 
-# GitHub/source package dependencies
+# GitHub/Source Package Dependencies
 # Format: (module_name, package_name, zip_file, local_only, github_repo)
 SOURCE_DEPS = [
     ('skill_scanner', 'cisco-ai-skill-scanner', 'cisco-skill-scanner-lite.zip', True, 'cisco-ai-defense/skill-scanner'),
@@ -83,7 +83,7 @@ def get_platform_info():
 
 
 def get_site_packages_path():
-    """Get site-packages path (prioritize standard Lib/site-packages)"""
+    """Get site-packages path (prefer standard Lib/site-packages)"""
     try:
         # macOS: prioritize user directory to avoid permission issues
         if sys.platform == 'darwin' and site.USER_SITE:
@@ -93,8 +93,8 @@ def get_site_packages_path():
 
         site_packages = site.getsitepackages()
         if site_packages:
-            # Prefer returning standard Lib/site-packages path
-            # Portable Python usually has multiple paths, last one is Lib/site-packages
+            # Prefer standard Lib/site-packages path
+            # Portable Python usually has multiple paths, last is Lib/site-packages
             for sp in reversed(site_packages):
                 if 'Lib/site-packages' in str(sp):
                     return Path(sp)
@@ -155,13 +155,13 @@ def check_source_deps():
     """Check source package dependencies
 
     Returns:
-        list: List of missing dependency info dictionaries
+        list: List of missing dependency info dicts
     """
     missing = []
     source_dir = OFFLINE_PACKAGES / "source"
 
     for item in SOURCE_DEPS:
-        # Compatible with old and new formats: (module, pkg, zip_file, local_only, github_repo?)
+        # Compatible with new and old format: (module, pkg, zip_file, local_only, github_repo?)
         module = item[0]
         pkg = item[1]
         zip_file = item[2]
@@ -186,7 +186,7 @@ def check_source_deps():
                 install_info["install_method"] = "extract"
                 install_info["install_hint"] = "Extract to site-packages directory"
             elif not local_only and github_repo:
-                # Only generate online install command for packages without local-only restriction
+                # Only generate online install command for non-local-only packages
                 install_info["online_install"] = f"pip install git+https://github.com/{github_repo}.git"
 
             missing.append(install_info)
@@ -206,7 +206,7 @@ def install_pip_wheel(offline_dir, site_packages):
         site_packages: site-packages path
 
     Returns:
-        bool: Success status
+        bool: Success
     """
     if not offline_dir or not offline_dir.exists():
         return False
@@ -228,16 +228,16 @@ def install_pip_wheel(offline_dir, site_packages):
 
 
 def install_package(pkg_name, offline_dir=None):
-    """Install single package, prioritize local cache
+    """Install single package, prefer local cache
 
     Args:
         pkg_name: Package name
         offline_dir: Local cache directory
 
     Returns:
-        (success, method): (success status, installation method)
+        (success, method): (success, install_method)
     """
-    # 1. Try local installation
+    # 1. Try local install
     if offline_dir and offline_dir.exists():
         try:
             cmd = [sys.executable, "-m", "pip", "install", "--no-index",
@@ -248,7 +248,7 @@ def install_package(pkg_name, offline_dir=None):
         except (subprocess.TimeoutExpired, OSError, FileNotFoundError):
             pass
 
-    # 2. Try online installation
+    # 2. Try online install
     try:
         cmd = [sys.executable, "-m", "pip", "install", pkg_name]
         result = subprocess.run(cmd, capture_output=True, timeout=180)
@@ -261,11 +261,11 @@ def install_source_package(zip_path, site_packages):
     """Extract and install source package (safe version, prevents Zip Slip)
 
     Args:
-        zip_path: Compressed package path
+        zip_path: Package zip path
         site_packages: site-packages path
 
     Returns:
-        bool: Success status
+        bool: Success
     """
     if not site_packages:
         return False
@@ -280,13 +280,20 @@ def install_source_package(zip_path, site_packages):
                 if len(parts) > 1:
                     top_dirs.add(parts[0])
 
-            # Determine prefix
+            # Determine prefix: detect if single root dir is a Python package (contains __init__.py)
+            # If so, preserve directory structure, otherwise strip (compatible with distribution structure)
             if len(top_dirs) == 1:
-                prefix = list(top_dirs)[0] + '/'
+                root_dir = list(top_dirs)[0]
+                # Check if root directory contains __init__.py (Python package marker)
+                has_init = any(
+                    name == f"{root_dir}/__init__.py"
+                    for name in zf.namelist()
+                )
+                prefix = '' if has_init else (root_dir + '/')
             else:
                 prefix = ''
 
-            # Safe extraction: validate paths, prevent Zip Slip
+            # Safe extraction: validate path, prevent Zip Slip
             for member in zf.namelist():
                 if not member.startswith(prefix):
                     continue
@@ -301,7 +308,7 @@ def install_source_package(zip_path, site_packages):
                 try:
                     target_path.relative_to(site_packages.resolve())
                 except ValueError:
-                    # Path escape detected, skip
+                    # Path escape, skip
                     continue
 
                 if member.endswith('/'):
@@ -316,7 +323,7 @@ def install_source_package(zip_path, site_packages):
 
 
 def auto_install_deps(missing_pypi, missing_source):
-    """Automatically install missing dependencies
+    """Auto-install missing dependencies
 
     Args:
         missing_pypi: List of missing PyPI packages
@@ -347,7 +354,7 @@ def auto_install_deps(missing_pypi, missing_source):
             result["installed"].append("pip (offline)")
         else:
             result["pypi_failed"].append("pip")
-            # pip installation failed, cannot continue installing other packages
+            # pip install failed, cannot continue installing other packages
             other_packages = []
 
     # Install other PyPI packages (requires pip)
@@ -374,11 +381,11 @@ def auto_install_deps(missing_pypi, missing_source):
 
 
 # =============================================================================
-# Offline Install Command Generation (retained for manual installation scenarios)
+# Offline Install Command Generation (for manual installation scenarios)
 # =============================================================================
 
 def generate_install_commands(missing_pypi, missing_source):
-    """Generate offline-priority installation commands (safe version, prevents command injection)
+    """Generate offline-priority install commands (safe version, prevents command injection)
 
     Returns:
         dict: {pypi_commands: [], source_commands: [], extract_commands: []}
@@ -396,26 +403,26 @@ def generate_install_commands(missing_pypi, missing_source):
         "offline_available": offline_dir.exists() if offline_dir else False,
     }
 
-    # PyPI package installation commands
+    # PyPI package install commands
     for pkg in missing_pypi:
         # Use shlex.quote() to prevent command injection
         safe_pkg = shlex.quote(pkg)
         if offline_dir and offline_dir.exists():
-            # Offline priority
+            # Offline first
             safe_platform = shlex.quote(str(offline_dir))
             cmd = f"python -m pip install --no-index --find-links={safe_platform} {safe_pkg}"
             fallback = f"python -m pip install {safe_pkg}"
             commands["pypi_commands"].append(f"{cmd} || {fallback}")
         else:
-            # Online installation
+            # Online install
             commands["pypi_commands"].append(f"python -m pip install {safe_pkg}")
 
-    # Source package installation commands
+    # Source package install commands
     for dep in missing_source:
         if dep.get("has_offline"):
             zip_path = dep["offline_path"]
             if site_packages:
-                # Generate safe extraction command (using script method, avoid command injection)
+                # Generate safe extraction command (use script approach to avoid command injection)
                 safe_zip = shlex.quote(str(zip_path))
                 safe_site = shlex.quote(str(site_packages))
                 # Use heredoc to generate temporary script
@@ -452,7 +459,7 @@ def generate_install_commands(missing_pypi, missing_source):
 
 
 # =============================================================================
-# Version Update Check
+# Version Update Detection
 # =============================================================================
 
 def get_local_version():
@@ -475,8 +482,8 @@ def get_local_version():
 
 
 def check_update():
-    """Check version updates"""
-    # Cooldown: no duplicate requests within 7 days
+    """Check for version updates"""
+    # Cooldown check: no duplicate requests within 7 days
     if UPDATE_CACHE.exists() and time.time() - UPDATE_CACHE.stat().st_mtime < 604800:
         return None
 
@@ -511,7 +518,7 @@ def check_update():
             else:
                 return {"has_update": False, "version": local}
     except (urllib.error.HTTPError, urllib.error.URLError, json.JSONDecodeError, ValueError, OSError) as e:
-        # Network error or parse error, silently ignore
+        # Network or parse error, silently ignore
         pass
     return None
 
@@ -571,7 +578,7 @@ def main():
         "need_install_reminder": False
     }
 
-    # Platform info (call only once)
+    # Platform info (call once)
     platform_dir, platform_name = get_platform_info()
     output["platform"] = platform_name
 
@@ -581,7 +588,7 @@ def main():
     # 2. Check source dependencies
     missing_source = check_source_deps()
 
-    # 3. Auto install missing dependencies
+    # 3. Auto-install missing dependencies
     if missing_pypi or missing_source:
         install_result = auto_install_deps(missing_pypi, missing_source)
 
@@ -591,7 +598,7 @@ def main():
                 "pypi_failed": install_result["pypi_failed"],
                 "source_failed": install_result["source_failed"],
             }
-            # Generate manual installation commands on failure
+            # Generate manual install commands on failure
             # Pass complete missing_source info, let generate_install_commands filter itself
             failed_source_deps = [d for d in missing_source if d["name"] in install_result["source_failed"]]
             commands = generate_install_commands(
@@ -612,7 +619,7 @@ def main():
     # 4. Refresh mapping table
     refresh_mapping()
 
-    # 5. Version check
+    # 5. Version detection
     update_info = check_update()
     if update_info:
         output["update"] = update_info

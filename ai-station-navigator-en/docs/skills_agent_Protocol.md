@@ -1,7 +1,7 @@
 # Skills Agent Dispatch Protocol v3.0
 
 > **Positioning**: Kernel ↔ Skills Agent Communication Contract
-> **Principle**: Structured Dispatch + Unified Return + Clear Error Handling
+> **Principle**: Structured Dispatch + Unified Return + Explicit Error Handling
 
 ---
 
@@ -11,27 +11,28 @@
 **Synchronous Execution Architecture**: Skills Agent uses synchronous execution mode, task results obtained directly in `Task` return value.
 
 ```yaml
-# ✅ Correct: Process Task return value directly
+# Correct: Process Task return value directly
 result = Task("skills_agent", "Execute skill", "Execute @markdown-converter README.md")
-# → Result already in result, no subsequent retrieval needed
+# Result already in result, no subsequent retrieval needed
 
-# ❌ Wrong: Attempt to retrieve with TaskOutput
-TaskOutput(task_id=xxx)  # → Sync task has no task_id, will error
+# Wrong: Attempt to retrieve with TaskOutput
+TaskOutput(task_id=xxx)  # Sync task has no task_id, will error
 ```
 
 ### 1.2 Task Tool Signature
 ```
 Task(
-  "skills_agent",              // Fixed sub-agent type
-  "<3-5 word task summary>",   // description: task brief
-  "Execute @<skill_name> [params]", // prompt: natural language instruction
-  { model?: "sonnet" | "opus" | "haiku" }  // Optional model
+  "skills_agent",
+  "<3-5 word task summary>",
+  "Execute @<skill_name> [params]"
 )
 ```
 
-### 1.2 Prompt Construction Rules
+**Core Constraint**: Agent triggers user-required skills through Skill tool
+
+### 1.3 Prompt Construction Rules
 ```yaml
-# Standard Format
+# Standard format
 Execute @<skill_name> [params...]
 
 # Examples
@@ -40,25 +41,25 @@ Execute @image-resizer photo.jpg --width 800
 Execute @code-analyzer src/ --language python
 ```
 
-### 1.3 Pre-dispatch Check [MUST]
-- [ ] Skill installed (if not installed, guide installation)
-- [ ] Required parameters provided (if missing, ask user)
-- [ ] Not multi-step task (multi-step tasks designed as workflow by Kernel)
+### 1.4 Pre-dispatch Check [MUST]
+- [ ] Skill installed (guide user to install if not)
+- [ ] Required parameters provided (ask user if missing)
+- [ ] Not multi-step task (multi-step tasks designed by Kernel as workflow)
 
-### 1.4 Parameter Completeness Mandatory Check [P0-FORCE]
+### 1.5 Parameter Completeness Mandatory Check [P0-FORCE]
 
-**Must check skill's `required_params` config before execution, prohibited from executing if parameters missing.**
+**Must check skill's `required_params` configuration before execution, prohibit execution if parameters missing.**
 
-#### Check Flow
+#### Check Process
 
 ```
 1. Read required_params from SKILL.md frontmatter
     ↓
 2. Parse user input, extract provided parameters
     ↓
-3. Compare required_params list, identify missing parameters
+3. Compare with required_params list, identify missing parameters
     ↓
-4. Missing parameters → Ask user first, prohibited to skip
+4. Missing parameters → Ask user first, prohibit skipping
     ↓
 5. Validation passed → Continue skill execution
 ```
@@ -68,7 +69,7 @@ Execute @code-analyzer src/ --language python
 ```yaml
 required_params:
   - name: github_url
-    prompt: Target project GitHub URL
+    prompt: Target project's GitHub URL
     validation: url_format
     required: true
   - name: requirements
@@ -82,7 +83,7 @@ required_params:
 #### Validation Rules
 
 | validation | Meaning | Check Method |
-|:-----------|:--------|:-------------|
+|:-----------|:-----|:---------|
 | `url_format` | URL format | Starts with http:// or https:// |
 | `not_empty` | Non-empty | Content length > 0 |
 | `email` | Email format | Contains @ symbol |
@@ -90,11 +91,11 @@ required_params:
 
 #### Interrupt Behavior
 
-When `required: true` parameter is detected as missing:
+When detecting parameters with `required: true` missing:
 
 ```yaml
 # Return pending status
-⏸️ skills_agent waiting for params: need <param_name>
+pause-icon skills_agent waiting for parameters: Needs <param_name>
   state: pending
   data: {
     required: ["github_url", "requirements"],
@@ -106,9 +107,9 @@ When `required: true` parameter is detected as missing:
 
 #### Execution Guarantee
 
-- **Prohibit Skip**: Must interrupt and ask when `interrupt_on_missing: true`
-- **Prohibit Guessing**: Must not auto-fill or assume user intent
-- **Complete Passthrough**: Show the `prompt` defined in SKILL.md completely to user
+- **Prohibit skipping**: When `interrupt_on_missing: true`, must interrupt and ask
+- **Prohibit guessing**: Must not auto-fill or assume user intent
+- **Complete delivery**: Fully display `prompt` defined in SKILL.md to user
 
 ---
 
@@ -123,43 +124,43 @@ When `required: true` parameter is detected as missing:
 ### 2.2 Status Code Definition
 | Status | Icon | Meaning | Usage Scenario |
 |:---|:---|:---|:---|
-| `success` | ✅ | Complete success | Skill execution completed |
-| `pending` | ⏸️ | Waiting for params | Need more info from user |
-| `error` | ❌ | Execution failed | Recoverable or unrecoverable error |
-| `timeout` | ⏱️ | Timeout | Execution exceeded 90 seconds |
+| `success` | check-icon | Complete success | Skill execution completed |
+| `pending` | pause-icon | Waiting for parameters | Need user to provide more information |
+| `error` | x-icon | Execution failed | Recoverable or unrecoverable error |
+| `timeout` | clock-icon | Timeout | Execution exceeded 90 seconds |
 
-### 2.3 Content Passthrough Rules [P0]
-When Skills Agent returns containing the following fields, Kernel **must** actively output:
+### 2.3 Content Pass-through Rule [P0]
+When Skills Agent returns containing following fields, Kernel **MUST** actively output:
 
 | Field Type | Trigger Fields | Direct Output | File Output |
 |:---|:---|:---:|:---:|
 | Text | `content`/`text`/`article` | ≤2000 chars | >2000 chars → mybox/ |
 | Code | `code`/`script` | ≤100 lines | >100 lines → mybox/ |
-| Analysis Result | `analysis`/`report` | ✅ Always output | - |
+| Analysis result | `analysis`/`report` | Always output | - |
 
 ### 2.4 Standard Return Examples
 
 ```yaml
 # Success
-✅ skills_agent execution succeeded: Markdown conversion → mybox/workspace/result.html
+check-icon skills_agent execution succeeded: Markdown conversion → mybox/workspace/result.html
   state: success
   data: {skill: "markdown-converter", output_path: "mybox/workspace/result.html", output_size: "12.5KB"}
   meta: {agent: skills_agent, time: 1.8, ts: "2025-01-29T10:30:00Z"}
 
-# Waiting for params
-⏸️ skills_agent waiting for params: need input_file
+# Waiting for parameters
+pause-icon skills_agent waiting for parameters: Needs input_file
   state: pending
   data: {required: ["input_file"], optional: ["format", "quality"]}
   meta: {agent: skills_agent, time: 0.1, ts: "2025-01-29T10:30:00Z"}
 
 # Error
-❌ skills_agent ParamMissing: Insufficient params: need input_file
+x-icon skills_agent ParamMissing: Insufficient parameters: Needs input_file
   state: error
   data: {type: "ParamMissing", msg: "Required parameter 'input_file' not provided", recoverable: true}
   meta: {agent: skills_agent, time: 0.2, ts: "2025-01-29T10:30:00Z"}
 
 # Timeout
-⏱️ skills_agent Timeout: Execution timeout (>90 seconds)
+clock-icon skills_agent Timeout: Execution timeout (>90 seconds)
   state: timeout
   data: {skill: "large-processor", elapsed: 90, limit: 90}
   meta: {agent: skills_agent, time: 90, ts: "2025-01-29T10:30:00Z"}
@@ -173,8 +174,8 @@ When Skills Agent returns containing the following fields, Kernel **must** activ
 |:---|:---|:---:|:---|
 | `SkillNotFound` | Skill not installed: `<name>` | true | Guide user to install |
 | `MetadataMissing` | SKILL.md corrupted or missing | false | Reinstall skill |
-| `ParamMissing` | Insufficient params: need `<param>` | true | Ask user to provide |
-| `RuntimeFailed` | Execution failed: `<stderr snippet>` | null | Judge by specific error |
+| `ParamMissing` | Insufficient parameters: Needs `<param>` | true | Ask user to provide |
+| `RuntimeFailed` | Execution failed: `<stderr fragment>` | null | Judge by specific error |
 | `Timeout` | Execution timeout (>90 seconds) | true | Suggest splitting task |
 
 ---
@@ -188,52 +189,15 @@ When Skills Agent returns containing the following fields, Kernel **must** activ
 
 ### Type B (Prompt Skill) Return Format
 ```yaml
-✅ skills_agent prompt loaded: marketing-ideas
+check-icon skills_agent prompt loaded: marketing-ideas
   state: success
   data: {
     skill: "marketing-ideas",
     type: "prompt",
     name: "Marketing Ideas Generator",
-    description: "Provide marketing strategy suggestions",
-    content: "<SKILL.md full content>",
+    description: "Provides marketing strategy suggestions",
+    content: "<Complete SKILL.md content>",
     executable: false
   }
   meta: {agent: skills_agent, time: 0.1, ts: "2025-01-30T10:00:00Z"}
 ```
-
----
-
-## 5. Comparison with Other Agents
-
-| Agent | Config File | Responsibility | Exclusive Feature |
-|:---|:---|:---|:---|
-| **worker_agent** | `.claude/agents/worker_agent.md` | Execute `bin/` scripts | Idempotency (5s cache) |
-| **skills_agent** | `.claude/agents/skills_agent.md` | Execute installed skills | Timeout (90s limit) |
-
----
-
-## 6. Python Encoding Compatibility [P0]
-
-**Root Cause**: Windows Python defaults to GBK encoding, cannot output emoji, causing script crashes.
-
-**Mandatory Requirement**: All Python scripts must add UTF-8 encoding setting at the beginning:
-
-```python
-import sys
-import os
-
-# Windows UTF-8 Compatibility (P0 - All scripts must include)
-if sys.platform == 'win32':
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-        sys.stderr.reconfigure(encoding='utf-8')
-    except:
-        import io
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-```
-
-**Prohibit emoji**: Emoji is prohibited in output information, use ASCII instead:
-- `✅` → `[OK]` / `success:`
-- `❌` → `[ERROR]` / `failed:`
-- `⚠️` → `[WARN]` / `warning:`

@@ -1082,29 +1082,53 @@ class SkillInstaller:
     """将转换后的技能安装到 .claude/skills/"""
 
     @staticmethod
-    def _extract_github_info(github_url: str) -> Tuple[Optional[str], Optional[str]]:
-        """从 GitHub URL 提取 author 和 repo
+    def _extract_github_info(github_url: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+        """从 GitHub URL 提取 author、repo 和子路径
 
         支持格式:
         - https://github.com/author/repo
+        - https://github.com/author/repo/tree/branch
+        - https://github.com/author/repo/tree/branch/skills/skill-name
+        - https://github.com/author/repo/tree/main/skills/agent
         - author/repo (简写格式)
 
         Returns:
-            (author, repo)
+            (author, repo, subpath)
+            subpath: 可选的子路径（如 "skills/agent"），用于定位子技能
         """
+        from urllib.parse import urlparse
+
+        subpath = None
+
         if "github.com" in github_url:
             # 完整 URL 格式
-            parts = github_url.rstrip('/').split('/')
-            for i, part in enumerate(parts):
-                if part == "github.com" and i + 2 < len(parts):
-                    return parts[i + 1], parts[i + 2]
+            parsed = urlparse(github_url)
+            path_parts = parsed.path.rstrip('/').split('/')
+
+            # 基本结构: /author/repo/...
+            if len(path_parts) >= 3 and path_parts[0] == '':
+                author = path_parts[1]
+                repo = path_parts[2]
+
+                # 检查是否有子路径 (tree/branch/skills/...)
+                if len(path_parts) > 3:
+                    # 跳过 "tree" 和分支名
+                    if len(path_parts) > 4 and path_parts[3] == "tree":
+                        # 子路径从分支名之后开始
+                        subpath = '/'.join(path_parts[5:]) if len(path_parts) > 5 else None
+                    else:
+                        # 其他格式的子路径
+                        subpath = '/'.join(path_parts[3:]) if len(path_parts) > 3 else None
+
+                return author, repo, subpath
         else:
             # 简写格式: author/repo
             if '/' in github_url:
                 parts = github_url.rstrip('/').split('/')
                 if len(parts) == 2:
-                    return parts[0], parts[1]
-        return None, None
+                    return parts[0], parts[1], None
+
+        return None, None, None
 
     @staticmethod
     def _get_skill_name_from_md(skill_dir: Path) -> Optional[str]:
@@ -1122,8 +1146,50 @@ class SkillInstaller:
             return None
 
     @staticmethod
-    def _extract_from_local_skill(skill_name: str) -> Optional[Dict]:
-        """从本地 SKILL.md 提取完整元数据"""
+    def _load_cache_meta(skill_dir: Path) -> Tuple[Optional[str], Optional[str]]:
+        """从缓存目录的 .meta.json 读取 author 和 repo
+
+        Args:
+            skill_dir: 技能目录（可能在缓存子目录中）
+
+        Returns:
+            (author, repo) 或 (None, None)
+        """
+        import json
+
+        # 向上查找缓存目录（包含 .meta.json 的目录）
+        current_dir = skill_dir
+        for _ in range(3):  # 最多向上查找 3 层
+            meta_file = current_dir / ".meta.json"
+            if meta_file.exists():
+                try:
+                    with open(meta_file, "r", encoding="utf-8") as f:
+                        meta = json.load(f)
+                        author = meta.get("author", "")
+                        repo = meta.get("repo", "")
+                        if author and repo:
+                            return author, repo
+                except Exception:
+                    pass
+                break
+
+            # 向上一层
+            parent = current_dir.parent
+            if parent == current_dir:
+                break
+            current_dir = parent
+
+        return None, None
+
+    @staticmethod
+    def _extract_from_local_skill(skill_name: str, author: str = "", repo: str = "") -> Optional[Dict]:
+        """从本地 SKILL.md 提取完整元数据
+
+        Args:
+            skill_name: 技能文件夹名
+            author: GitHub 作者名（从安装链接解析，用于 parent_repo 字段）
+            repo: GitHub 仓库名（从安装链接解析，用于 repo 字段）
+        """
         skill_path = CLAUDE_SKILLS_DIR / skill_name
         skill_md = skill_path / "SKILL.md"
 
@@ -1139,6 +1205,13 @@ class SkillInstaller:
             if not description:
                 description = SkillNormalizer._extract_description_from_content(content)
 
+            # 构建 parent_repo: author/repo 格式
+            parent_repo_value = ""
+            if author and repo:
+                parent_repo_value = f"{author}/{repo}"
+            elif author:
+                parent_repo_value = author
+
             return {
                 "id": skill_name.lower().replace('_', '-'),
                 "name": frontmatter.get("name", skill_name),
@@ -1148,8 +1221,8 @@ class SkillInstaller:
                 "tags": frontmatter.get("tags", DEFAULT_SKILL_TAGS.copy()),
                 "keywords_cn": [],
                 "parent": "",
-                "parent_repo": "",
-                "repo": "",
+                "parent_repo": parent_repo_value,
+                "repo": repo or "",
                 "stars": "",
                 "install": f".claude/skills/{skill_name}",
                 "source_file": "auto_created",
@@ -1162,11 +1235,13 @@ class SkillInstaller:
             return None
 
     @staticmethod
-    def _sync_skill_to_db(skill_name: str, db=None, Skill=None) -> bool:
+    def _sync_skill_to_db(skill_name: str, author: str = "", repo: str = "", db=None, Skill=None) -> bool:
         """将技能同步到数据库（支持连接复用）
 
         Args:
             skill_name: 技能名称
+            author: GitHub 作者名（从安装链接解析）
+            repo: GitHub 仓库名（从安装链接解析）
             db: 可选的外部数据库连接（用于批量复用）
             Skill: 可选的外部 Query 对象（用于批量复用）
         """
@@ -1175,12 +1250,12 @@ class SkillInstaller:
             with db_connection() as (conn_db, conn_Skill):
                 if conn_db is None:
                     return False
-                return SkillInstaller._sync_skill_to_db(skill_name, conn_db, conn_Skill)
+                return SkillInstaller._sync_skill_to_db(skill_name, author, repo, conn_db, conn_Skill)
 
         # 使用提供的连接进行数据库操作
         try:
             # 从本地 SKILL.md 提取元数据
-            metadata = SkillInstaller._extract_from_local_skill(skill_name)
+            metadata = SkillInstaller._extract_from_local_skill(skill_name, author, repo)
             if not metadata:
                 warn(f"无法提取技能元数据: {skill_name}")
                 return False
@@ -1281,7 +1356,7 @@ class SkillInstaller:
         return True, ""
 
 
-def batch_install(skill_dirs: List[Path], force: bool = False, author: Optional[str] = None, repo: Optional[str] = None, non_interactive: bool = False, scan_results: Optional[Dict] = None) -> Dict[str, Any]:
+def batch_install(skill_dirs: List[Path], force: bool = False, author: Optional[str] = None, repo: Optional[str] = None, non_interactive: bool = False, scan_results: Optional[Dict] = None, install_path_to_original: Optional[Dict[Path, Path]] = None) -> Dict[str, Any]:
     """批量安装技能（重构版：仅负责安装，不进行扫描）
 
     Args:
@@ -1290,6 +1365,7 @@ def batch_install(skill_dirs: List[Path], force: bool = False, author: Optional[
         author: GitHub 作者名
         repo: GitHub 仓库名
         scan_results: 可选的扫描结果（由 security_scanner 提供）
+        install_path_to_original: 安装路径到原始路径的映射（用于获取 .meta.json）
 
     Returns:
         {"success": [...], "failed": [...], "skipped": [...]}
@@ -1303,13 +1379,36 @@ def batch_install(skill_dirs: List[Path], force: bool = False, author: Optional[
     # 批量复制所有技能文件
     copied_skills = []
     for skill_dir in skill_dirs:
+        # 获取原始路径（如果有映射），保留 .meta.json 访问能力
+        original_dir = install_path_to_original.get(skill_dir, skill_dir) if install_path_to_original else skill_dir
+
+        # 判断是否来自 GitHub 缓存目录
+        is_from_github_cache = "cache" in str(original_dir).replace("\\", "/")
+
+        # 为每个技能获取 author/repo
+        skill_author, skill_repo = author, repo
+        if not skill_author or not skill_repo:
+            cached_author, cached_repo = SkillInstaller._load_cache_meta(original_dir)
+            if cached_author and cached_repo:
+                skill_author, skill_repo = cached_author, cached_repo
+
         # 读取技能名称
         skill_name_from_md = SkillInstaller._get_skill_name_from_md(skill_dir)
 
-        if skill_name_from_md and author:
-            repo_part = f"-{repo}" if repo else ""
-            skill_name = f"{author}{repo_part}-{skill_name_from_md}".lower()
+        # 命名规则构建
+        if skill_name_from_md and skill_author:
+            # 有 author 信息：使用 author-repo-skill 格式
+            repo_part = f"-{skill_repo}" if skill_repo else ""
+            skill_name = f"{skill_author}{repo_part}-{skill_name_from_md}".lower()
+        elif skill_name_from_md and is_from_github_cache:
+            # GitHub 来源但无 author 信息：报错
+            results["failed"].append({
+                "name": skill_dir.name,
+                "message": "GitHub 安装的技能必须包含 author 信息，但未找到 .meta.json"
+            })
+            continue
         elif skill_name_from_md:
+            # 非 GitHub 来源允许自定义名称
             skill_name = skill_name_from_md
         else:
             skill_name = skill_dir.name
@@ -1337,7 +1436,7 @@ def batch_install(skill_dirs: List[Path], force: bool = False, author: Optional[
         # 复制文件
         try:
             shutil.copytree(skill_dir, target_dir)
-            copied_skills.append((skill_name, target_dir))
+            copied_skills.append((skill_name, target_dir, skill_author or "", skill_repo or ""))
         except Exception as e:
             results["failed"].append({"name": skill_name, "message": f"复制失败: {e}"})
 
@@ -1349,16 +1448,16 @@ def batch_install(skill_dirs: List[Path], force: bool = False, author: Optional[
     safe_skills = []
 
     if scan_results:
-        for skill_name, target_dir in copied_skills:
+        for skill_name, target_dir, skill_author, skill_repo in copied_skills:
             scan_result = scan_results.get(skill_name, {"status": "skipped"})
 
             if scan_result.get("status") == "skipped":
-                safe_skills.append((skill_name, target_dir))
+                safe_skills.append((skill_name, target_dir, skill_author, skill_repo))
             elif scan_result.get("severity") in ["SAFE", "LOW"]:
-                safe_skills.append((skill_name, target_dir))
+                safe_skills.append((skill_name, target_dir, skill_author, skill_repo))
             else:
                 threatened_skills.append((skill_name, target_dir, scan_result))
-                safe_skills.append((skill_name, target_dir))
+                safe_skills.append((skill_name, target_dir, skill_author, skill_repo))
 
         # 构建威胁详情
         threat_details = []
@@ -1389,8 +1488,8 @@ def batch_install(skill_dirs: List[Path], force: bool = False, author: Optional[
 
     # 批量写入数据库
     with db_connection() as (db, Skill):
-        for skill_name, target_dir in safe_skills:
-            db_sync_success = SkillInstaller._sync_skill_to_db(skill_name, db, Skill)
+        for skill_name, target_dir, skill_author, skill_repo in safe_skills:
+            db_sync_success = SkillInstaller._sync_skill_to_db(skill_name, skill_author, skill_repo, db, Skill)
             if db_sync_success:
                 success(f"✅ 安装成功: {skill_name} (数据库已同步)")
                 results["success"].append({"name": skill_name, "message": "安装成功"})
@@ -1638,7 +1737,8 @@ class SkillSearcher:
                         "tags": ["标签列表"],
                         "category": "类别(小写)",
                         "keywords_cn": ["中文关键词"],
-                        "description_raw": "原始描述"
+                        "description_raw": "原始描述",
+                        "parent_repo": "父仓库 (如: kepano/obsidian-skills)"
                     }
                 },
                 "mtime": 目录修改时间
@@ -1646,6 +1746,20 @@ class SkillSearcher:
         """
         if not CLAUDE_SKILLS_DIR.exists():
             return {"skills": {}, "mtime": 0}
+
+        # 从数据库读取 parent_repo 映射
+        repo_map = {}
+        if TINYDB_AVAILABLE:
+            try:
+                with db_connection() as (db, Skill):
+                    if db:
+                        for record in db.all():
+                            folder = record.get("folder_name", "")
+                            parent_repo = record.get("parent_repo", "")
+                            if parent_repo:
+                                repo_map[folder] = parent_repo
+            except Exception:
+                pass
 
         skills = {}
         for skill_dir in CLAUDE_SKILLS_DIR.iterdir():
@@ -1670,14 +1784,19 @@ class SkillSearcher:
                 if isinstance(keywords_cn, str):
                     keywords_cn = [k.strip() for k in keywords_cn.split(",") if k.strip()]
 
+                # 从数据库获取 parent_repo
+                folder_name = skill_dir.name
+                parent_repo = repo_map.get(folder_name, "")
+
                 skills[name] = {
                     "name": name,
-                    "folder": skill_dir.name,
+                    "folder": folder_name,
                     "description": description.lower(),
                     "tags": tags if isinstance(tags, list) else [tags],
                     "category": category.lower(),
                     "keywords_cn": keywords_cn,
-                    "description_raw": description
+                    "description_raw": description,
+                    "parent_repo": parent_repo.lower()
                 }
             except Exception:
                 # 跳过读取失败的技能
@@ -1717,19 +1836,32 @@ class SkillSearcher:
         SkillSearcher._index_mtime = None
 
     @staticmethod
-    def search_skills(keywords: List[str], limit: int = 10) -> List[Dict]:
+    def search_skills(keywords: List[str], limit: int = 10, repo_filter: str = "") -> List[Dict]:
         """
         搜索技能（使用缓存索引）
 
         Args:
             keywords: 搜索关键词列表
             limit: 返回结果数量
+            repo_filter: 仓库过滤条件 (如: "kepano/obsidian-skills")
 
         Returns:
             按相关度排序的技能列表 [(name, score, reasons), ...]
         """
         if not CLAUDE_SKILLS_DIR.exists():
             return []
+
+        # 解析仓库过滤条件
+        normalized_repo_filter = ""
+        if repo_filter:
+            # 支持完整 URL 或 author/repo 格式
+            if "github.com" in repo_filter:
+                # 从 URL 提取 author/repo
+                parts = repo_filter.strip("/").split("/")
+                if len(parts) >= 2:
+                    normalized_repo_filter = f"{parts[-2]}/{parts[-1]}".lower()
+            else:
+                normalized_repo_filter = repo_filter.lower()
 
         # 使用缓存索引（首次或目录变化时自动重建）
         index_data = SkillSearcher._get_skill_index()
@@ -1746,6 +1878,11 @@ class SkillSearcher:
             category = skill_data["category"]
             keywords_cn = skill_data["keywords_cn"]
             folder = skill_data["folder"]
+            parent_repo = skill_data.get("parent_repo", "")
+
+            # 仓库过滤：如果不匹配则跳过
+            if normalized_repo_filter and normalized_repo_filter not in parent_repo:
+                continue
 
             # 计算匹配分数
             total_score = 0
@@ -1774,25 +1911,31 @@ class SkillSearcher:
                     match_reasons.append(f"名称包含: {keyword}")
                     matched = True
 
-                # 4. 中文关键词匹配：40分
+                # 4. 仓库匹配：60分
+                elif normalized_repo_filter and keyword_lower in parent_repo:
+                    total_score += 60
+                    match_reasons.append(f"仓库匹配: {keyword}")
+                    matched = True
+
+                # 5. 中文关键词匹配：40分
                 elif any(keyword_lower in k.lower() for k in keywords_cn):
                     total_score += 40
                     match_reasons.append(f"中文关键词: {keyword}")
                     matched = True
 
-                # 5. 描述包含：50分
+                # 6. 描述包含：50分
                 elif keyword_lower in description:
                     total_score += 50
                     match_reasons.append(f"描述包含: {keyword}")
                     matched = True
 
-                # 6. 标签匹配：30分
+                # 7. 标签匹配：30分
                 elif keyword_lower in str(tags).lower():
                     total_score += 30
                     match_reasons.append(f"标签匹配: {keyword}")
                     matched = True
 
-                # 7. 类别匹配：20分
+                # 8. 类别匹配：20分
                 elif keyword_lower in category:
                     total_score += 20
                     match_reasons.append(f"类别匹配: {keyword}")
@@ -1801,12 +1944,17 @@ class SkillSearcher:
                 if matched:
                     matched_keywords.add(keyword_lower)
 
-            # 8. 多关键词协同加成：20分
+            # 如果指定了仓库过滤但没有关键词，自动加分
+            if normalized_repo_filter and not keywords and normalized_repo_filter in parent_repo:
+                total_score += 50
+                match_reasons.append(f"仓库: {parent_repo}")
+
+            # 9. 多关键词协同加成：20分
             if len(matched_keywords) >= 2:
                 total_score += 20
                 match_reasons.append(f"多关键词匹配加成({len(matched_keywords)})")
 
-            # 9. 使用频率加权：最多+15分
+            # 10. 使用频率加权：最多+15分
             if name in usage_data:
                 frequency_score = min(usage_data[name] * 3, 15)
                 if frequency_score > 0:
@@ -1992,11 +2140,15 @@ def main():
     )
 
     # search 命令
-    search_parser = subparsers.add_parser("search", help="搜索技能（关键词/描述/标签）")
+    search_parser = subparsers.add_parser("search", help="搜索技能（关键词/描述/标签/仓库）")
     search_parser.add_argument(
         "keywords",
-        nargs="+",
+        nargs="*",
         help="搜索关键词（支持多个关键词，AND 逻辑）"
+    )
+    search_parser.add_argument(
+        "--repo", "-r",
+        help="按 GitHub 仓库搜索（如: kepano/obsidian-skills 或完整 URL）"
     )
     search_parser.add_argument(
         "--limit", "-l",
@@ -2017,8 +2169,12 @@ def main():
     uninstall_parser = subparsers.add_parser("uninstall", help="卸载技能并同步数据库状态")
     uninstall_parser.add_argument(
         "name",
-        nargs="+",
-        help="技能名称（支持多个，空格分隔）"
+        nargs="*",
+        help="技能名称（支持多个，空格分隔），或使用 --repo 指定仓库 URL"
+    )
+    uninstall_parser.add_argument(
+        "--repo", "-r",
+        help="按 GitHub 仓库卸载（如: kepano/obsidian-skills 或完整 URL，智能体专用）"
     )
     uninstall_parser.add_argument(
         "--force", "-f",
@@ -2029,8 +2185,9 @@ def main():
     # install 命令 - 统一安装接口
     install_parser = subparsers.add_parser("install", help="统一安装接口（支持所有格式）")
     install_parser.add_argument(
-        "source",
-        help="安装源（GitHub URL、本地目录、.skill 包）"
+        "sources",
+        nargs="+",
+        help="安装源（支持多个：path1 path2 ... 或 GitHub URL、本地目录、.skill 包）"
     )
     install_parser.add_argument(
         "--batch", "-b",
@@ -2144,10 +2301,20 @@ def main():
     elif args.command == "search":
         header("技能搜索")
 
-        results = SkillSearcher.search_skills(args.keywords, args.limit)
+        # 获取仓库过滤条件
+        repo_filter = getattr(args, 'repo', '') or ""
+
+        # 如果指定了 --repo 但没有关键词，显示仓库所有技能
+        if repo_filter and not args.keywords:
+            info(f"按仓库搜索: {repo_filter}\n")
+
+        results = SkillSearcher.search_skills(args.keywords, args.limit, repo_filter)
 
         if not results:
-            warn(f"未找到匹配技能: {' '.join(args.keywords)}")
+            if repo_filter:
+                warn(f"未找到匹配技能: 仓库={repo_filter}, 关键词={' '.join(args.keywords) if args.keywords else '(无)'}")
+            else:
+                warn(f"未找到匹配技能: {' '.join(args.keywords)}")
             return 0
 
         print(f"找到 {len(results)} 个匹配技能:\n")
@@ -2196,8 +2363,27 @@ def main():
     elif args.command == "uninstall":
         header("技能卸载器")
 
+        # 智能体模式：按仓库删除
+        repo_filter = getattr(args, 'repo', '') or ""
+        if repo_filter:
+            # 使用 search 获取该仓库的所有技能
+            info(f"按仓库删除: {repo_filter}")
+            search_results = SkillSearcher.search_skills([], limit=100, repo_filter=repo_filter)
+            if not search_results:
+                warn(f"未找到该仓库的技能: {repo_filter}")
+                return 0
+            # 提取技能名称列表（使用 folder_name，因为搜索返回的 name 可能是简称）
+            skill_names = [r['folder'] for r in search_results]
+            info(f"找到 {len(skill_names)} 个技能")
+        else:
+            # 原有模式：直接按技能名称删除
+            if not args.name:
+                error("错误: 需要指定技能名称或使用 --repo 参数")
+                return 1
+            skill_names = args.name
+
         # 规范化技能名为小写（修复大小写不匹配问题）
-        skill_names = [name.lower() for name in args.name]
+        skill_names = [name.lower() for name in skill_names]
         success_count = 0
         failed_list = []
 
@@ -2238,7 +2424,7 @@ def main():
                 def _remove_readonly(func, path, excinfo):
                     """处理 Windows 只读文件删除问题"""
                     import os
-                    os.chmod(path, 0o777)
+                    os.chmod(path, 0o700)  # 所有者可读写执行，足够删除
                     func(path)
 
                 shutil.rmtree(skill_dir, onerror=_remove_readonly)
@@ -2290,66 +2476,64 @@ def main():
     elif args.command == "install":
         header("技能安装器")
 
-        # 1. 检测输入类型
-        input_type, input_source, subpath = FormatDetector.detect_input_type(args.source)
-        info(f"输入类型: {input_type}")
+        # 获取命令行参数
+        github_author = getattr(args, "author", None)
+        github_repo = getattr(args, "repo", None)
+        force = getattr(args, "force", False)
 
+        # 处理多个安装源
+        all_skills_to_process = []
+        scan_results = None
+        threatened_skills = []
         temp_dir = TEMP_DIR / f"installer_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         temp_dir.mkdir(parents=True, exist_ok=True)
 
-        skills_to_process = []
-        scan_results = None
-        threatened_skills = []
+        # 遍历每个源
+        for input_source in args.sources:
+            info(f"\n处理源: {input_source}")
 
-        # 2. 对于 GitHub 源，需要先使用独立工具处理
-        if input_type == "github":
-            error("GitHub 源需要使用独立工具处理，请按以下步骤操作:")
-            print()
-            print("步骤 1: 克隆仓库")
-            print(f"  python bin/clone_manager.py clone {input_source}")
-            print()
-            print("步骤 2: 安全扫描（可选）")
-            print(f"  python bin/security_scanner.py scan-all")
-            print()
-            print("步骤 3: 安装技能")
-            print(f"  python bin/skill_manager.py install <本地路径>")
-            print()
-            return 1
+            # 1. 检测输入类型
+            input_type, detected_source, subpath = FormatDetector.detect_input_type(input_source)
+            info(f"输入类型: {input_type}")
 
-        else:
-            # 非 GitHub 源，使用传统处理方式
+            # 2. 对于 GitHub 源，需要先使用独立工具处理
+            if input_type == "github":
+                error("GitHub 源需要使用独立工具处理，请按以下步骤操作:")
+                print()
+                print("步骤 1: 克隆仓库")
+                print(f"  python bin/clone_manager.py clone {input_source}")
+                print()
+                print("步骤 2: 安全扫描（可选）")
+                print(f"  python bin/security_scanner.py scan-all")
+                print()
+                print("步骤 3: 安装技能")
+                print(f"  python bin/skill_manager.py install <本地路径>")
+                print()
+                return 1
+
+            # 3. 处理非 GitHub 源
             skills_to_process, error_msg = _process_input_source(
-                input_source, input_type, temp_dir, args.skill_name,
-                args.batch, subpath,
+                detected_source or input_source, input_type, temp_dir,
+                getattr(args, "skill_name", None),
+                getattr(args, "batch", False), subpath,
                 force_refresh=getattr(args, "refresh_cache", False)
             )
             if error_msg:
-                error(f"{error_msg}，退出")
-                return 1
+                error(f"{error_msg}，跳过")
+                continue
 
-        if not skills_to_process:
+            all_skills_to_process.extend(skills_to_process)
+
+        if not all_skills_to_process:
             error("没有待处理的技能")
             return 1
 
-        # 2.5 提取 GitHub 信息（优先使用命令行参数）
-        github_author = getattr(args, "author", None)
-        github_repo = getattr(args, "repo", None)
-        if not github_author and input_type == "github":
-            github_author, github_repo = SkillInstaller._extract_github_info(str(input_source))
-            info(f"GitHub: {github_author}/{github_repo}")
-
-        # 输出处理信息
-        if args.skill_name:
-            info(f"安装指定子技能: {args.skill_name}")
-        elif len(skills_to_process) == SINGLE_SKILL_THRESHOLD:
-            info(f"找到 1 个技能，自动安装")
-        else:
-            info(f"检测到 {len(skills_to_process)} 个技能，自动批量安装")
-
         # 3. 处理每个技能（格式转换）
         converted_skills = []
+        # 路径映射：安装路径 -> 原始路径（用于获取 .meta.json）
+        install_path_to_original = {}
 
-        for skill_dir in skills_to_process:
+        for skill_dir in all_skills_to_process:
             skill_name = skill_dir.name
             info(f"\n处理技能: {skill_name}")
 
@@ -2366,9 +2550,9 @@ def main():
             # 官方格式直接安装，其他格式转换
             if format_type == "official":
                 info("官方格式，直接安装")
-                target_dir = temp_dir / "processed" / skill_name
-                shutil.copytree(skill_dir, target_dir)
-                converted_skills.append(target_dir)
+                # 直接使用原始路径，保留 .meta.json 访问能力
+                converted_skills.append(skill_dir)
+                install_path_to_original[skill_dir] = skill_dir
             else:
                 info("需要转换")
                 target_dir = temp_dir / "processed" / skill_name
@@ -2376,6 +2560,8 @@ def main():
                 if convert_ok:
                     success(msg)
                     converted_skills.append(target_dir)
+                    # 记录原始路径，用于获取 .meta.json
+                    install_path_to_original[target_dir] = skill_dir
                 else:
                     error(msg)
 
@@ -2383,7 +2569,8 @@ def main():
         if converted_skills:
             info(f"\n安装 {len(converted_skills)} 个技能...")
 
-            results = batch_install(converted_skills, args.force, github_author, github_repo, scan_results=scan_results)
+            results = batch_install(converted_skills, args.force, github_author, github_repo,
+                                  scan_results=scan_results, install_path_to_original=install_path_to_original)
 
             # 打印结果
             if results.get("success"):
@@ -2434,8 +2621,11 @@ def main():
 
         # 6. 总结
         header("安装完成")
-        print(f"安装源: {args.source}")
-        print(f"处理技能数: {len(skills_to_process)}")
+        sources_str = " ".join(str(s) for s in args.sources)
+        if len(sources_str) > 60:
+            sources_str = sources_str[:60] + "..."
+        print(f"安装源: {sources_str}")
+        print(f"处理技能数: {len(all_skills_to_process)}")
         print(f"安装成功: {len(results.get('success', []))}")
 
         # 7. 更新技能映射表（仅当有成功安装时）

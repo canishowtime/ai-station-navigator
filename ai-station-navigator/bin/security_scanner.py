@@ -32,8 +32,9 @@ if sys.platform == 'win32':
 import json
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 import gc
+import time
 
 # =============================================================================
 # 补丁应用状态标志（懒加载）
@@ -223,6 +224,8 @@ def _patch_skill_loader() -> bool:
 
 BASE_DIR = Path(__file__).parent.parent
 SKILLS_DIR = BASE_DIR / ".claude" / "skills"
+CACHE_DIR = BASE_DIR / "mybox" / "cache" / "repos"
+TEMP_DIR = BASE_DIR / "mybox" / "temp"
 CONFIG_FILE = BASE_DIR / ".claude" / "config" / "security.yml"
 
 # 添加 bin 目录到 sys.path
@@ -403,13 +406,16 @@ def scan(skill_path: Path, config: Optional[Dict] = None) -> Dict[str, Any]:
         }
 
 
-def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None) -> Dict[str, Dict]:
+def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None,
+               timeout: int = 60, show_progress: bool = True) -> Dict[str, Dict]:
     """
-    批量扫描技能（支持并发）
+    批量扫描技能（支持并发、超时和进度反馈）
 
     Args:
         skill_dirs: 技能目录列表
         config: 可选配置
+        timeout: 单个技能超时时间（秒），默认 5 分钟
+        show_progress: 是否显示进度信息
 
     Returns:
         {skill_name: scan_result, ...}
@@ -442,11 +448,20 @@ def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None) -> Dict[st
     info(f"[SCAN] 批量并行扫描 {len(skill_dirs)} 个技能 (4线程)...")
 
     batch_size = 8
+    total_batches = (len(skill_dirs) + batch_size - 1) // batch_size
+    completed_count = 0
+    start_time = time.time()
+
     for i in range(0, len(skill_dirs), batch_size):
         batch = skill_dirs[i:i + batch_size]
         batch_num = i // batch_size + 1
-        total_batches = (len(skill_dirs) + batch_size - 1) // batch_size
-        info(f"  批次 {batch_num}/{total_batches}: 扫描 {len(batch)} 个技能...")
+
+        if show_progress:
+            elapsed = time.time() - start_time
+            avg_time = elapsed / completed_count if completed_count > 0 else 0
+            remaining = avg_time * (len(skill_dirs) - completed_count) if avg_time > 0 else 0
+            info(f"  批次 {batch_num}/{total_batches} ({completed_count}/{len(skill_dirs)} 完成, "
+                 f"已用时: {elapsed:.1f}s, 预估剩余: {remaining:.1f}s)")
 
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = {
@@ -454,10 +469,27 @@ def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None) -> Dict[st
                 for skill_dir in batch
             }
 
-            for future in futures:
+            for future in as_completed(futures):
                 skill_dir = futures[future]
                 try:
-                    scan_results[skill_dir.name] = future.result()
+                    result = future.result(timeout=timeout)
+                    scan_results[skill_dir.name] = result
+                    if show_progress:
+                        completed_count += 1
+                        status_icon = "[OK]" if result["status"] == "success" else "[!]"
+                        print(f"    {completed_count}/{len(skill_dirs)} {skill_dir.name} {status_icon} "
+                              f"{result['severity']} ({result['findings_count']} 威胁)")
+                except TimeoutError:
+                    scan_results[skill_dir.name] = {
+                        "status": "error",
+                        "error": f"扫描超时 (>{timeout}s)",
+                        "severity": "UNKNOWN",
+                        "findings_count": 0,
+                        "threats": []
+                    }
+                    if show_progress:
+                        completed_count += 1
+                        print(f"    {completed_count}/{len(skill_dirs)} {skill_dir.name} [TIMEOUT]")
                 except Exception as e:
                     scan_results[skill_dir.name] = {
                         "status": "error",
@@ -466,6 +498,9 @@ def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None) -> Dict[st
                         "findings_count": 0,
                         "threats": []
                     }
+                    if show_progress:
+                        completed_count += 1
+                        print(f"    {completed_count}/{len(skill_dirs)} {skill_dir.name} [ERROR] {str(e)[:50]}")
 
         # 强制垃圾回收
         gc.collect()
@@ -516,28 +551,28 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # 扫描指定技能
-  python bin/security_scanner.py scan my-skill
+  # 扫描缓存目录中的新技能（根据克隆脚本输出）
+  python bin/security_scanner.py scan-cache
 
-  # 扫描所有已安装技能
-  python bin/security_scanner.py scan-all
+  # 扫描指定路径（仅允许缓存目录）
+  python bin/security_scanner.py scan <cache_path>
 
   # 查看当前配置
   python bin/security_scanner.py config
 
-Note: 克隆功能已移至 clone_manager.py
+SECURITY: 扫描仅限 mybox/cache/repos/ 目录，禁止扫描已安装技能。
         """
     )
 
     subparsers = parser.add_subparsers(dest="command", help="可用命令")
 
-    # scan 命令
-    scan_parser = subparsers.add_parser("scan", help="扫描指定技能")
-    scan_parser.add_argument("target", help="技能名称或路径")
+    # scan 命令（仅允许缓存目录）
+    scan_parser = subparsers.add_parser("scan", help="扫描指定路径（仅限缓存目录）")
+    scan_parser.add_argument("target", help="技能路径（必须是 mybox/cache/repos/ 下的路径）")
     scan_parser.add_argument("--json", action="store_true", help="输出 JSON 格式（供脚本解析）")
 
-    # scan-all 命令
-    subparsers.add_parser("scan-all", help="扫描所有已安装技能")
+    # scan-cache 命令（扫描克隆脚本输出的新技能）
+    subparsers.add_parser("scan-cache", help="扫描缓存目录中的新技能（根据克隆脚本输出）")
 
     # config 命令
     subparsers.add_parser("config", help="查看当前配置")
@@ -560,13 +595,25 @@ Note: 克隆功能已移至 clone_manager.py
         target = args.target
         skill_path = None
 
-        if not Path(target).is_absolute():
-            skill_path = SKILLS_DIR / target
-            if not skill_path.exists():
-                print(f"错误: 技能不存在: {target}")
-                return 1
-        else:
+        if Path(target).is_absolute():
+            # 绝对路径：直接使用
             skill_path = Path(target)
+        else:
+            # 相对路径：从 BASE_DIR 解析
+            skill_path = BASE_DIR / target
+
+        # 路径安全验证：必须位于缓存目录下
+        try:
+            skill_path.resolve().relative_to(CACHE_DIR.resolve())
+        except ValueError:
+            print(f"错误: 安全限制 - 扫描仅限缓存目录 (mybox/cache/repos/)")
+            print(f"目标路径: {skill_path.resolve()}")
+            print(f"允许范围: {CACHE_DIR.resolve()}")
+            return 1
+
+        if not skill_path.exists():
+            print(f"错误: 路径不存在: {skill_path.resolve()}")
+            return 1
 
         result = scan(skill_path, config)
 
@@ -597,39 +644,90 @@ Note: 克隆功能已移至 clone_manager.py
 
         return 0 if result["status"] == "success" else 1
 
-    elif args.command == "scan-all":
-        if not SKILLS_DIR.exists():
-            print("错误: 技能目录不存在")
+    elif args.command == "scan-cache":
+        # 扫描缓存目录中的新技能（根据克隆脚本输出）
+        if not CACHE_DIR.exists():
+            print("错误: 缓存目录不存在")
             return 1
 
-        skills = [d for d in SKILLS_DIR.iterdir() if d.is_dir()]
+        # 优先读取 .last_cloned_repo 文件（克隆脚本写入）
+        last_cloned_file = TEMP_DIR / ".last_cloned_repo"
+        scan_dirs = []
 
-        if not skills:
-            print("没有已安装的技能")
+        if last_cloned_file.exists():
+            try:
+                with open(last_cloned_file, "r", encoding="utf-8") as f:
+                    repo_name = f.read().strip()
+                target_repo = CACHE_DIR / repo_name
+                if target_repo.exists() and target_repo.is_dir():
+                    scan_dirs = [target_repo]
+                    info(f"[SCAN] 扫描最新克隆仓库: {repo_name}")
+                else:
+                    warn(f".last_cloned_repo 指定的仓库不存在: {repo_name}")
+                    scan_dirs = [d for d in CACHE_DIR.iterdir() if d.is_dir() and d.name != ".gitkeep"]
+            except Exception as e:
+                warn(f"读取 .last_cloned_repo 失败: {e}")
+                scan_dirs = [d for d in CACHE_DIR.iterdir() if d.is_dir() and d.name != ".gitkeep"]
+        else:
+            # 文件不存在：扫描全部（向后兼容）
+            info("[SCAN] 未找到 .last_cloned_repo 标记，扫描全部缓存目录")
+            scan_dirs = [d for d in CACHE_DIR.iterdir() if d.is_dir() and d.name != ".gitkeep"]
+
+        # 查找技能子目录
+        cache_skills = []
+        for repo_dir in scan_dirs:
+            # 查找 repo 下的技能目录（包含 SKILL.md 的目录）
+            for skill_dir in repo_dir.rglob("*"):
+                if skill_dir.is_dir() and (skill_dir / "SKILL.md").exists():
+                    cache_skills.append(skill_dir)
+
+        if not cache_skills:
+            print("缓存目录中没有发现技能")
             return 0
 
-        print(f"扫描 {len(skills)} 个已安装技能...\n")
+        print(f"扫描缓存目录中的 {len(cache_skills)} 个技能...\n")
 
+        # 使用批量并发扫描
+        scan_results = batch_scan(cache_skills, config, timeout=60, show_progress=True)
+
+        # 汇总结果
         all_safe = True
         threatened_skills = []
 
-        for skill_dir in skills:
-            print(f"扫描: {skill_dir.name}")
-            result = scan(skill_dir, config)
-
-            status_icon = "[OK]" if result["status"] == "success" else "[!]"
-            print(f"  {status_icon} {result['severity']} - {result['findings_count']} 个威胁")
-
+        for skill_dir, result in scan_results.items():
             if result["status"] != "success":
                 all_safe = False
-                threatened_skills.append((skill_dir.name, result))
-            print()
+                threatened_skills.append((skill_dir, result))
+            else:
+                status_icon = "[OK]"
+                print(f"  {status_icon} {skill_dir}: {result['severity']}")
+
+        print()
+
+        # 显示威胁详情
+        if threatened_skills:
+            print(f"发现 {len(threatened_skills)} 个威胁技能:")
+            for skill_name, result in threatened_skills:
+                status = result.get("status", "unknown")
+                severity = result.get("severity", "UNKNOWN")
+                count = result.get("findings_count", 0)
+                error = result.get("error", "")
+
+                if error:
+                    print(f"  [!] {skill_name}: {error}")
+                else:
+                    print(f"  [!] {skill_name}: {severity} ({count} 个威胁)")
+
+                    # 显示威胁列表
+                    for threat in result.get("threats", [])[:3]:
+                        print(f"      - [{threat['severity']}] {threat['title']}")
+                    if len(result.get("threats", [])) > 3:
+                        print(f"      ... 还有 {len(result.get('threats', [])) - 3} 个")
 
         if all_safe:
             print("所有技能扫描通过")
             return 0
         else:
-            print(f"发现 {len(threatened_skills)} 个威胁技能")
             return 1
 
     return 0

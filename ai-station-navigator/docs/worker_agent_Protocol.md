@@ -22,12 +22,9 @@ TaskOutput(task_id=xxx)  # → 同步任务无 task_id，会报错
 ### 1.2 Task 工具签名
 ```
 Task(
-  "worker_agent",              // 固定子智能体类型
-  "<3-5词任务摘要>",            // description: 任务简述
-  "执行 python bin/<脚本> [参数]", // prompt: 完整执行指令
-  {
-    idempotency_key?: string   // 幂等键: 相同键5s内仅执行一次
-  }
+  "worker_agent",
+  "<3-5词任务摘要>",
+  "执行 python bin/<脚本> [参数]"
 )
 ```
 

@@ -130,7 +130,7 @@ Enter the following instructions directly into the chat box to manage and run sk
 
 * **Check Capabilities**: `What skills do you have now?`
 * **Install App**: `Install skill: https://github.com/xxx/repo` (Automatically performs installation. If the main project is a skill package, it is recommended to point the address path correctly to the specific skill you need; otherwise, the entire skill package will be installed).
-* **Use App**: `@Skill [Requirement Content]` (Automatically analyzes the requirement, matches installed skills, and executes immediately upon confirmation, returning the result).
+* **Use App**: `@@Skill [Requirement Content]` (Automatically analyzes the requirement, matches installed skills, and executes immediately upon confirmation, returning the result).
 * **Uninstall App**: `Uninstall skill: https://github.com/xxx/repo` or `xxx/repo`.
 * **Try Creating a Skills Workflow**: `Refer to docs\skills-mapping.md to design a workflow containing X steps, based on the flow xx,xx,xx,xx..., to be used in the xxxx scenario.`
 
@@ -278,7 +278,7 @@ ai-station-navigator/
 
 * **查看能力**：`你现在有哪些技能？`
 * **安装应用**：`安装技能：https://github.com/xxx/repo   （自动执行安装，如果主项目是技能包，建议地址路径正确指示到你需要单个技能，否则会安装整个技能包）
-* **使用应用**： `@技能  需求内容`  （自动分析需求匹配已安装技能，确认后可立即执行并返回执行结果）
+* **使用应用**： `@@技能  需求内容`  （自动分析需求匹配已安装技能，确认后可立即执行并返回执行结果）
 * **卸载应用**：`卸载技能：https://github.com/xxx/repo  或  xxx/repo`
 * **尝试创建skills工作流**：`参考 docs\skills-mapping.md 设计一个包含x步的工作流，以流程xx,xx,xx,xx...为准，可以用在xxxx场景`
 这里收藏了一些可用于测试的github项目：[查看技能分类](skills-by-category.md)

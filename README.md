@@ -95,7 +95,7 @@ ai-station-navigator/
 Download the **[All-in-One Package](https://github.com/canishowtime/ai-station-navigator/releases)** to achieve zero-configuration operation:
 
 #### Windows Users
-1. **Launch**: Double-click `Start ai-station-navigator.bat` in the root directory.
+1. **Launch**: Double-click `Start.bat` in the root directory.
 2. **Ready**: Follow the on-screen prompts to install missing components and input your self-prepared `LLM-API-KEY` to enter the startup state.
 
 #### macOS Users
@@ -243,7 +243,7 @@ ai-station-navigator/
 下载**[整合包](https://github.com/canishowtime/ai-station-navigator/releases) **后，即可实现零配置运行：
 
 #### Windows 用户
-1. **启动**：双击根目录下的 `启动 ai-station-navigator.bat`。
+1. **启动**：双击根目录下的 `启动.bat`。
 2. **就绪**：按照屏幕提示安装缺失组件并输入自行准备的 `LLM-API-KEY`，即可进入启动状态。
 
 #### macOS 用户

@@ -12,7 +12,7 @@
 
 ```yaml
 # ✅ 正确：直接处理 Task 返回值
-result = Task("skills_agent", "执行技能", "执行 @markdown-converter README.md")
+result = Task("skills_agent", "执行技能", "执行 @@markdown-converter README.md")
 # → 结果已在 result 中，无需后续检索
 
 # ❌ 错误：尝试用 TaskOutput 检索
@@ -24,7 +24,7 @@ TaskOutput(task_id=xxx)  # → 同步任务无 task_id，会报错
 Task(
   "skills_agent",
   "<3-5词任务摘要>",
-  "使用 Skill 工具调用 @<技能名> [参数]"
+  "使用 Skill 工具调用 @@<技能名> [参数]"
 )
 ```
 
@@ -33,12 +33,12 @@ Task(
 ### 1.2 Prompt 构建规则
 ```yaml
 # 标准格式
-执行 @<技能名> [参数...]
+执行 @@<技能名> [参数...]
 
 # 示例
-执行 @markdown-converter README.md
-执行 @image-resizer photo.jpg --width 800
-执行 @code-analyzer src/ --language python
+执行 @@markdown-converter README.md
+执行 @@image-resizer photo.jpg --width 800
+执行 @@code-analyzer src/ --language python
 ```
 
 ### 1.3 派发前检查 [MUST]

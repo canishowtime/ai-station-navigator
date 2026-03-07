@@ -1,6 +1,6 @@
-# Skill Manager Agent 调度协议 v2.0
+# App Manager Agent 调度协议 v2.0
 
-> **定位**: Kernel ↔ Skill Manager Agent 的通信契约
+> **定位**: Kernel ↔ App Manager Agent 的通信契约
 > **原则**: 仅定义接口，不描述实现
 
 ---
@@ -10,7 +10,7 @@
 ### Task 签名
 ```
 Task(
-  "skill_manager_agent",
+  "app_manager_agent",
   "<3-5词任务摘要>",
   "<自然语言指令，包含必要参数>"
 )
@@ -19,19 +19,19 @@ Task(
 ### 调用示例
 ```yaml
 # 安装技能 - 传递原始 URL
-Task("skill_manager_agent", "安装技能", "从 https://github.com/user/repo 安装技能")
+Task("app_manager_agent", "安装技能", "从 https://github.com/user/repo 安装技能")
 
 # 安装指定子技能 - 使用完整子路径 URL（脚本自动解析）
-Task("skill_manager_agent", "安装技能", "从 https://github.com/user/repo/tree/main/skills/skill-a 安装")
+Task("app_manager_agent", "安装技能", "从 https://github.com/user/repo/tree/main/skills/skill-a 安装")
 
 # 删除技能 - 按名称
-Task("skill_manager_agent", "删除技能", "删除技能 skill-a skill-b")
+Task("app_manager_agent", "删除技能", "删除技能 skill-a skill-b")
 
 # 删除技能 - 按仓库 URL
-Task("skill_manager_agent", "删除技能", "删除 https://github.com/user/repo")
+Task("app_manager_agent", "删除技能", "删除 https://github.com/user/repo")
 
 # 恢复安装 (pending 后)
-Task("skill_manager_agent", "继续安装", "resume: keep skill-b, uninstall skill-c")
+Task("app_manager_agent", "继续安装", "resume: keep skill-b, uninstall skill-c")
 ```
 
 ---
@@ -50,7 +50,7 @@ Task("skill_manager_agent", "继续安装", "resume: keep skill-b, uninstall ski
 
 **安装成功**:
 ```yaml
-✅ skill_manager_agent 安装完成: 2/3 成功
+✅ app_manager_agent 安装完成: 2/3 成功
   state: success
   data: {
     installed: ["skill-a", "skill-b"],
@@ -61,7 +61,7 @@ Task("skill_manager_agent", "继续安装", "resume: keep skill-b, uninstall ski
 
 **等待审核**:
 ```yaml
-⏸️ skill_manager_agent 等待审核: 1 个技能需决策
+⏸️ app_manager_agent 等待审核: 1 个技能需决策
   state: pending
   data: {
     threatened_skills: [
@@ -91,7 +91,7 @@ Task("skill_manager_agent", "继续安装", "resume: keep skill-b, uninstall ski
 
 **删除成功**:
 ```yaml
-✅ skill_manager_agent 删除完成: 2 个技能
+✅ app_manager_agent 删除完成: 2 个技能
   state: success
   data: {
     uninstalled: ["skill-a", "skill-b"],
@@ -101,7 +101,7 @@ Task("skill_manager_agent", "继续安装", "resume: keep skill-b, uninstall ski
 
 **错误**:
 ```yaml
-❌ skill_manager_agent CloneFailed: 仓库不存在
+❌ app_manager_agent CloneFailed: 仓库不存在
   state: error
   data: {
     type: "CloneFailed",

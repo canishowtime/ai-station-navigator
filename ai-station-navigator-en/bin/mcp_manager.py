@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-mcp_manager.py - MCP Manager (MCP Server Manager)
+mcp_manager.py - MCP Manager (MCP 服务器管理器)
 --------------------------------------------------
-Unified management of Model Context Protocol (MCP) server lifecycle
+统一管理 Model Context Protocol (MCP) 服务器的生命周期
 
-Responsibilities:
-1. Server Management - Add, remove, list MCP servers
-2. Permission Configuration - Auto-manage MCP tool permission configuration
-3. Connection Test - Verify MCP server connection status
-4. Backup & Rollback - Auto backup before operations, auto rollback on failure
+职责：
+1. 服务器管理 - 添加、移除、列出 MCP 服务器
+2. 权限配置 - 自动管理 MCP 工具的权限配置
+3. 连接测试 - 验证 MCP 服务器连接状态
+4. 备份回滚 - 操作前自动备份，失败自动回滚
 
 Architecture:
-    Kernel (AI) -> MCP Manager -> Config Handler -> Backup System
+    Kernel (AI) → MCP Manager → Config Handler → Backup System
 
 Usage:
     python bin/mcp_manager.py list
@@ -20,21 +20,21 @@ Usage:
     python bin/mcp_manager.py test <name>
 
 v2.1 - Feature Complete:
-    - Support MCP server installation and configuration
-    - Support MCP server connection test and health check
-    - Support enable/disable MCP servers (via add/remove)
-    - Support MCP server uninstallation
-    - List all available/installed MCP servers
-    - Support preset template system (context7, tavily, etc.)
-    - Support multiple API Key configuration methods (--env/interactive/environment variables)
-    - Auto backup and rollback mechanism
+    - 支持 MCP 服务器的安装与配置
+    - 支持 MCP 服务器的连接测试与健康检查
+    - 支持启用/禁用 MCP 服务器（通过 add/remove）
+    - 支持卸除 MCP 服务器
+    - 列出所有可用/已安装的 MCP 服务器
+    - 支持预设模板系统（context7, tavily等）
+    - 支持多种 API Key 配置方式（--env/交互式/环境变量）
+    - 自动备份与回滚机制
 """
 
 import argparse
 import sys
 import os
 
-# Windows UTF-8 compatibility (P0 - must be included in all scripts)
+# Windows UTF-8 兼容 (P0 - 所有脚本必须包含)
 if sys.platform == 'win32':
     try:
         sys.stdout.reconfigure(encoding='utf-8')
@@ -52,13 +52,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# Add project lib directory to sys.path (pre-built dependencies for portable package)
+# 添加项目 lib 目录到 sys.path（绿色包预置依赖）
 _lib_dir = Path(__file__).parent.parent / "lib"
 if _lib_dir.exists():
     sys.path.insert(0, str(_lib_dir))
 
 # =============================================================================
-# Configuration Constants
+# 配置常量
 # =============================================================================
 
 BASE_DIR = Path(__file__).parent.parent
@@ -66,11 +66,11 @@ MCP_CONFIG_FILE = BASE_DIR / ".mcp.json"
 SETTINGS_FILE = BASE_DIR / ".claude" / "settings.local.json"
 BACKUP_DIR = BASE_DIR / "mybox" / "backups" / "mcp"
 
-# Platform-specific commands (P0 - cross-platform compatibility)
+# 平台特定命令 (P0 - 跨平台兼容)
 NPX_COMMAND = "npx.cmd" if sys.platform == 'win32' else "npx"
 
 # =============================================================================
-# Preset Templates Registry
+# 预设模板注册表 (Preset Templates Registry)
 # =============================================================================
 
 PRESET_TEMPLATES = {
@@ -79,7 +79,7 @@ PRESET_TEMPLATES = {
         "args": ["-y", "@upstash/context7-mcp@latest"],
         "env": {},
         "tools": ["mcp__context7__resolve-library-id", "mcp__context7__query-docs"],
-        "description": "Context7 - Query programming library documentation and code examples"
+        "description": "Context7 - 查询编程库文档和代码示例"
     },
     "tavily": {
         "command": "npx",
@@ -92,14 +92,14 @@ PRESET_TEMPLATES = {
             "TAVILY_API_KEY": {"required": True, "description": "Tavily API Key"}
         },
         "tools": ["mcp__tavily__tavily_search", "mcp__tavily__tavily_extract"],
-        "description": "Tavily - Web search and content extraction (via mcp-remote)"
+        "description": "Tavily - 网络搜索与内容提取 (通过 mcp-remote)"
     },
     "filesystem": {
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-filesystem"],
         "env": {},
         "tools": ["mcp__filesystem__read_file", "mcp__filesystem__write_file"],
-        "description": "Filesystem - Filesystem access (requires path configuration)"
+        "description": "Filesystem - 文件系统访问（需要配置路径）"
     },
     "brave-search": {
         "command": "npx",
@@ -108,7 +108,7 @@ PRESET_TEMPLATES = {
             "BRAVE_API_KEY": {"required": True, "description": "Brave Search API Key"}
         },
         "tools": ["mcp__brave_search__brave_web_search"],
-        "description": "Brave Search - Privacy-friendly web search"
+        "description": "Brave Search - 隐私友好的网络搜索"
     },
     "github": {
         "command": "npx",
@@ -117,30 +117,30 @@ PRESET_TEMPLATES = {
             "GITHUB_TOKEN": {"required": True, "description": "GitHub Personal Access Token"}
         },
         "tools": ["mcp__github__push_repository"],
-        "description": "GitHub - GitHub repository operations"
+        "description": "GitHub - GitHub 仓库操作"
     },
     "sqlite": {
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-sqlite"],
         "env": {},
         "tools": ["mcp__sqlite__query"],
-        "description": "SQLite - SQLite database query"
+        "description": "SQLite - SQLite 数据库查询"
     },
     "memory": {
         "command": "npx",
         "args": ["-y", "@modelcontextprotocol/server-memory"],
         "env": {},
         "tools": ["mcp__memory__query", "mcp__memory__delete"],
-        "description": "Memory - Key-value storage"
+        "description": "Memory - 键值存储"
     },
 }
 
 # =============================================================================
-# Logging Utilities
+# 日志工具
 # =============================================================================
 
 class Colors:
-    """Terminal color codes"""
+    """终端颜色代码"""
     HEADER = "\033[95m"
     OKBLUE = "\033[94m"
     OKCYAN = "\033[96m"
@@ -153,7 +153,7 @@ class Colors:
 
 
 def log(level: str, message: str, emoji: str = ""):
-    """Unified log output"""
+    """统一日志输出"""
     timestamp = datetime.now().strftime("%H:%M:%S")
 
     color_map = {
@@ -195,91 +195,91 @@ def header(msg: str):
 
 
 # =============================================================================
-# Backup Manager
+# 备份管理器
 # =============================================================================
 
 class BackupManager:
-    """Configuration file backup and rollback"""
+    """配置文件备份与回滚"""
 
     def __init__(self):
         BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
     def backup(self) -> Optional[Path]:
-        """Backup current configuration files"""
+        """备份当前配置文件"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_path = BACKUP_DIR / f"backup_{timestamp}"
 
         try:
             backup_path.mkdir(parents=True, exist_ok=True)
 
-            # Backup .mcp.json
+            # 备份 .mcp.json
             if MCP_CONFIG_FILE.exists():
                 shutil.copy2(MCP_CONFIG_FILE, backup_path / "mcp.json")
 
-            # Backup settings.local.json
+            # 备份 settings.local.json
             if SETTINGS_FILE.exists():
                 shutil.copy2(SETTINGS_FILE, backup_path / "settings.json")
 
-            success(f"Configuration backed up to: {backup_path.relative_to(BASE_DIR)}")
+            success(f"配置已备份到: {backup_path.relative_to(BASE_DIR)}")
             return backup_path
         except Exception as e:
-            error(f"Backup failed: {e}")
+            error(f"备份失败: {e}")
             return None
 
     def rollback(self, backup_path: Path) -> bool:
-        """Restore configuration from backup"""
+        """从备份恢复配置"""
         try:
             if backup_path is None or not backup_path.exists():
-                error("Backup path does not exist")
+                error("备份路径不存在")
                 return False
 
-            # Restore .mcp.json
+            # 恢复 .mcp.json
             mcp_backup = backup_path / "mcp.json"
             if mcp_backup.exists():
                 shutil.copy2(mcp_backup, MCP_CONFIG_FILE)
 
-            # Restore settings.local.json
+            # 恢复 settings.local.json
             settings_backup = backup_path / "settings.json"
             if settings_backup.exists():
                 shutil.copy2(settings_backup, SETTINGS_FILE)
 
-            success("Configuration rolled back")
+            success("配置已回滚")
             return True
         except Exception as e:
-            error(f"Rollback failed: {e}")
+            error(f"回滚失败: {e}")
             return False
 
 
 # =============================================================================
-# MCP Configuration Handler
+# MCP 配置处理器
 # =============================================================================
 
 class MCPConfigHandler:
-    """MCP configuration file handler"""
+    """MCP 配置文件处理器"""
 
     def __init__(self):
         self.backup_manager = BackupManager()
 
     def load_mcp_config(self) -> Dict:
-        """Load MCP configuration"""
+        """加载 MCP 配置"""
         if not MCP_CONFIG_FILE.exists():
             return {"mcpServers": {}}
         with open(MCP_CONFIG_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
 
     def save_mcp_config(self, config: Dict) -> bool:
-        """Save MCP configuration"""
+        """保存 MCP 配置"""
         try:
             MCP_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
             with open(MCP_CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)
             return True
         except Exception as e:
-            error(f"Failed to save MCP configuration: {e}")
+            error(f"保存 MCP 配置失败: {e}")
             return False
 
     def load_settings_config(self) -> Dict:
-        """Load settings configuration"""
+        """加载 settings 配置"""
         if not SETTINGS_FILE.exists():
             return {
                 "permissions": {"allow": [], "deny": []},
@@ -290,41 +290,41 @@ class MCPConfigHandler:
             return json.load(f)
 
     def save_settings_config(self, config: Dict) -> bool:
-        """Save settings configuration"""
+        """保存 settings 配置"""
         try:
             SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)
             return True
         except Exception as e:
-            error(f"Failed to save settings configuration: {e}")
+            error(f"保存 settings 配置失败: {e}")
             return False
 
     def add_server(self, name: str, config: Dict, tools: List[str]) -> bool:
-        """Add MCP server"""
-        # Backup current configuration
+        """添加 MCP 服务器"""
+        # 备份当前配置
         backup_path = self.backup_manager.backup()
         if not backup_path:
             return False
 
         try:
-            # Update .mcp.json
+            # 更新 .mcp.json
             mcp_config = self.load_mcp_config()
             mcp_config["mcpServers"][name] = config
             if not self.save_mcp_config(mcp_config):
                 self.backup_manager.rollback(backup_path)
                 return False
 
-            # Update settings.local.json
+            # 更新 settings.local.json
             settings = self.load_settings_config()
 
-            # Add to enabledMcpjsonServers
+            # 添加到 enabledMcpjsonServers
             if "enabledMcpjsonServers" not in settings:
                 settings["enabledMcpjsonServers"] = []
             if name not in settings["enabledMcpjsonServers"]:
                 settings["enabledMcpjsonServers"].append(name)
 
-            # Add tool permissions
+            # 添加工具权限
             if "permissions" not in settings:
                 settings["permissions"] = {"allow": [], "deny": []}
             if "allow" not in settings["permissions"]:
@@ -338,29 +338,29 @@ class MCPConfigHandler:
                 self.backup_manager.rollback(backup_path)
                 return False
 
-            success(f"MCP server '{name}' added")
+            success(f"MCP 服务器 '{name}' 已添加")
             return True
 
         except Exception as e:
-            error(f"Failed to add server: {e}")
+            error(f"添加服务器失败: {e}")
             self.backup_manager.rollback(backup_path)
             return False
 
     def remove_server(self, name: str) -> bool:
-        """Remove MCP server"""
-        # Backup current configuration
+        """移除 MCP 服务器"""
+        # 备份当前配置
         backup_path = self.backup_manager.backup()
         if not backup_path:
             return False
 
         try:
-            # Remove from .mcp.json
+            # 从 .mcp.json 移除
             mcp_config = self.load_mcp_config()
             if name not in mcp_config.get("mcpServers", {}):
-                warn(f"MCP server '{name}' does not exist")
+                warn(f"MCP 服务器 '{name}' 不存在")
                 return False
 
-            # Get tool list for permission removal
+            # 获取工具列表以便移除权限
             server_config = mcp_config["mcpServers"][name]
             del mcp_config["mcpServers"][name]
 
@@ -368,10 +368,10 @@ class MCPConfigHandler:
                 self.backup_manager.rollback(backup_path)
                 return False
 
-            # Remove from settings.local.json
+            # 从 settings.local.json 移除
             settings = self.load_settings_config()
 
-            # Remove from enabledMcpjsonServers
+            # 从 enabledMcpjsonServers 移除
             if "enabledMcpjsonServers" in settings and name in settings["enabledMcpjsonServers"]:
                 settings["enabledMcpjsonServers"].remove(name)
 
@@ -379,16 +379,16 @@ class MCPConfigHandler:
                 self.backup_manager.rollback(backup_path)
                 return False
 
-            success(f"MCP server '{name}' removed")
+            success(f"MCP 服务器 '{name}' 已移除")
             return True
 
         except Exception as e:
-            error(f"Failed to remove server: {e}")
+            error(f"移除服务器失败: {e}")
             self.backup_manager.rollback(backup_path)
             return False
 
     def list_servers(self) -> List[Dict]:
-        """List all MCP servers"""
+        """列出所有 MCP 服务器"""
         mcp_config = self.load_mcp_config()
         settings = self.load_settings_config()
 
@@ -408,51 +408,51 @@ class MCPConfigHandler:
 
 
 # =============================================================================
-# Environment Variable Handler
+# 环境变量处理器
 # =============================================================================
 
 class EnvHandler:
-    """Environment variable configuration handler"""
+    """环境变量配置处理器"""
 
     @staticmethod
     def parse_env_args(env_args: List[str]) -> Dict[str, str]:
         """
-        Parse --env parameters
+        解析 --env 参数
 
-        Supports KEY=VALUE format, VALUE can contain `=` characters
-        Example: --env "TOKEN=abc=def=xyz" -> {"TOKEN": "abc=def=xyz"}
+        支持 KEY=VALUE 格式，VALUE 中可以包含 `=` 字符
+        示例: --env "TOKEN=abc=def=xyz" → {"TOKEN": "abc=def=xyz"}
         """
         env_dict = {}
         for arg in env_args:
             if "=" in arg:
-                # Only split on first =, preserve = in value
+                # 只按第一个 = 分割，保留值中的 =
                 first_eq_idx = arg.index("=")
                 key = arg[:first_eq_idx]
                 value = arg[first_eq_idx + 1:]
-                if key:  # Ensure key is not empty
+                if key:  # 确保键非空
                     env_dict[key] = value
             else:
-                warn(f"Ignoring invalid environment variable parameter: {arg} (format should be KEY=VALUE)")
+                warn(f"忽略无效的环境变量参数: {arg} (格式应为 KEY=VALUE)")
         return env_dict
 
     @staticmethod
     def resolve_env_value(key: str, template_info: Dict, provided_env: Dict[str, str]) -> Optional[str]:
-        """Resolve environment variable value"""
-        # 1. Prioritize command-line provided values
+        """解析环境变量值"""
+        # 1. 优先使用命令行提供的值
         if key in provided_env:
             return provided_env[key]
 
-        # 2. Try reading from system environment variables
+        # 2. 尝试从系统环境变量读取
         system_value = os.environ.get(key)
         if system_value:
             return system_value
 
-        # 3. Need interactive input (handled by caller)
+        # 3. 需要交互式输入（由调用方处理）
         return None
 
     @staticmethod
     def get_required_keys(template: Dict) -> List[str]:
-        """Get required API Keys from template"""
+        """获取模板中需要的 API Keys"""
         required = []
         for key, info in template.get("env", {}).items():
             if info.get("required", False):
@@ -461,50 +461,50 @@ class EnvHandler:
 
 
 # =============================================================================
-# MCP Manager Main Class
+# MCP 管理器主类
 # =============================================================================
 
 class MCPManager:
-    """MCP server manager"""
+    """MCP 服务器管理器"""
 
     def __init__(self):
         self.config_handler = MCPConfigHandler()
         self.env_handler = EnvHandler()
 
     def list_servers(self):
-        """List all MCP servers"""
-        header("MCP Server List")
+        """列出所有 MCP 服务器"""
+        header("MCP 服务器列表")
 
         servers = self.config_handler.list_servers()
 
         if not servers:
-            info("No installed MCP servers")
-            info("\nAvailable preset templates:")
+            info("暂无已安装的 MCP 服务器")
+            info("\n可用的预设模板:")
             for name, template in PRESET_TEMPLATES.items():
-                print(f"  - {name}: {template.get('description', 'No description')}")
+                print(f"  - {name}: {template.get('description', '无描述')}")
             return
 
-        # Display installed servers
+        # 显示已安装的服务器
         for server in servers:
-            status = f"{Colors.OKGREEN}[Enabled]{Colors.ENDC}" if server["enabled"] else f"{Colors.WARNING}[Disabled]{Colors.ENDC}"
-            env_indicator = f" {Colors.OKCYAN}(with env vars){Colors.ENDC}" if server["has_env"] else ""
+            status = f"{Colors.OKGREEN}[启用]{Colors.ENDC}" if server["enabled"] else f"{Colors.WARNING}[禁用]{Colors.ENDC}"
+            env_indicator = f" {Colors.OKCYAN}(含环境变量){Colors.ENDC}" if server["has_env"] else ""
 
             print(f"\n{status} {Colors.BOLD}{server['name']}{Colors.ENDC}{env_indicator}")
-            print(f"  Command: {server['command']} {server['args']}")
+            print(f"  命令: {server['command']} {server['args']}")
 
         print()
-        info("Available preset templates:")
+        info("可用的预设模板:")
         for name, template in PRESET_TEMPLATES.items():
             is_installed = any(s["name"] == name for s in servers)
-            status = f"{Colors.OKGREEN}[Installed]{Colors.ENDC}" if is_installed else ""
-            print(f"  - {name}: {template.get('description', 'No description')} {status}")
+            status = f"{Colors.OKGREEN}[已安装]{Colors.ENDC}" if is_installed else ""
+            print(f"  - {name}: {template.get('description', '无描述')} {status}")
 
     def add_server(self, name: str, command: str, args: List[str], env: Dict[str, str],
                    tools: List[str], is_custom: bool = False):
-        """Add MCP server"""
-        info(f"Adding MCP server: {name}")
+        """添加 MCP 服务器"""
+        info(f"添加 MCP 服务器: {name}")
 
-        # Build configuration
+        # 构建配置
         config = {
             "command": command,
             "args": args,
@@ -512,64 +512,64 @@ class MCPManager:
             "type": "stdio"
         }
 
-        # Add server
+        # 添加服务器
         if self.config_handler.add_server(name, config, tools):
-            info(f"\nServer configuration:")
-            print(f"  Name: {name}")
-            print(f"  Command: {command}")
-            print(f"  Args: {' '.join(args)}")
+            info(f"\n服务器配置:")
+            print(f"  名称: {name}")
+            print(f"  命令: {command}")
+            print(f"  参数: {' '.join(args)}")
             if env:
-                print(f"  Environment variables: {', '.join(env.keys())}")
-            print(f"  Tools: {', '.join(tools)}")
+                print(f"  环境变量: {', '.join(env.keys())}")
+            print(f"  工具: {', '.join(tools)}")
 
             if not is_custom:
-                success(f"\n'{name}' successfully added! Use 'python bin/mcp_manager.py test {name}' to test connection")
+                success(f"\n'{name}' 已成功添加！使用 'python bin/mcp_manager.py test {name}' 测试连接")
 
     def add_preset(self, name: str, env_args: List[str], interactive: bool = False):
-        """Add preset template server"""
+        """添加预设模板服务器"""
         if name not in PRESET_TEMPLATES:
-            error(f"Preset template not found: {name}")
-            info(f"Available templates: {', '.join(PRESET_TEMPLATES.keys())}")
+            error(f"未找到预设模板: {name}")
+            info(f"可用的模板: {', '.join(PRESET_TEMPLATES.keys())}")
             return
 
         template = PRESET_TEMPLATES[name]
         provided_env = self.env_handler.parse_env_args(env_args)
 
-        # Check if API Key is required
+        # 检查是否需要 API Key
         required_keys = self.env_handler.get_required_keys(template)
         final_env = {}
         api_key_value = None
 
         if required_keys:
-            info(f"\n'{name}' requires the following API Keys:")
+            info(f"\n'{name}' 需要以下 API Key:")
 
             for key in required_keys:
                 key_info = template["env"][key]
                 description = key_info.get("description", key)
 
-                # Try to resolve value
+                # 尝试解析值
                 value = self.env_handler.resolve_env_value(key, key_info, provided_env)
 
                 if value:
                     api_key_value = value
-                    success(f"  {key}: Configured ({'*' * 12})")
+                    success(f"  {key}: 已配置 ({'*' * 12})")
                 elif interactive:
-                    # Interactive input
+                    # 交互式输入
                     import getpass
-                    prompt = f"  Please enter {key} ({description}): "
+                    prompt = f"  请输入 {key} ({description}): "
                     value = getpass.getpass(prompt)
                     if value:
                         api_key_value = value
                     else:
-                        error(f"{key} not provided, installation cancelled")
+                        error(f"未提供 {key}，取消安装")
                         return
                 else:
-                    # Need to provide key
-                    error(f"\nMissing required API Key: {key}")
-                    info(f"Use --env {key}=YOUR_KEY or enable interactive input (-i)")
+                    # 需要提供 key
+                    error(f"\n缺少必需的 API Key: {key}")
+                    info(f"使用 --env {key}=YOUR_KEY 或启用交互式输入 (-i)")
                     return
 
-        # Handle {api_key} placeholder in args
+        # 处理 args 中的 {api_key} 占位符
         final_args = []
         for arg in template["args"]:
             if "{api_key}" in arg and api_key_value:
@@ -577,7 +577,7 @@ class MCPManager:
             else:
                 final_args.append(arg)
 
-        # Add server (platform-adapt npx command)
+        # 添加服务器（平台适配 npx 命令）
         command = template["command"]
         if command == "npx":
             command = NPX_COMMAND
@@ -591,26 +591,26 @@ class MCPManager:
         )
 
     def remove_server(self, name: str):
-        """Remove MCP server"""
-        info(f"Removing MCP server: {name}")
+        """移除 MCP 服务器"""
+        info(f"移除 MCP 服务器: {name}")
 
         if self.config_handler.remove_server(name):
-            success(f"'{name}' successfully removed")
+            success(f"'{name}' 已成功移除")
 
     def test_server(self, name: str):
         """
-        Test MCP server connection
+        测试 MCP 服务器连接
 
-        Note: MCP servers are continuous interaction protocols (stdio), won't exit automatically.
-        This test only verifies if the server can start successfully.
+        注意: MCP 服务器是持续交互的协议（stdio），不会自动退出。
+        此测试仅验证服务器能否成功启动。
         """
-        info(f"Testing MCP server: {name}")
+        info(f"测试 MCP 服务器: {name}")
 
         mcp_config = self.config_handler.load_mcp_config()
         servers = mcp_config.get("mcpServers", {})
 
         if name not in servers:
-            error(f"MCP server '{name}' does not exist")
+            error(f"MCP 服务器 '{name}' 不存在")
             return
 
         config = servers[name]
@@ -618,113 +618,114 @@ class MCPManager:
         args = config.get("args", [])
         env = config.get("env", {})
 
-        # Build environment variables
+        # 构建环境变量
         test_env = os.environ.copy()
         test_env.update(env)
 
-        info(f"\nExecuting command: {command} {' '.join(args)}")
-        info("Note: MCP server will keep running, test will auto-terminate in 3 seconds")
+        info(f"\n执行命令: {command} {' '.join(args)}")
+        info("提示: MCP 服务器将持续运行，测试将在 3 秒后自动终止")
 
         try:
-            # Build command list (safe way, avoid shell=True)
+            # 构建命令列表（安全方式，避免 shell=True）
             cmd_list = [command] + args
 
-            # Start process but don't wait (MCP is continuous protocol)
+            # 启动进程但不等待（MCP 是持续交互协议）
             process = subprocess.Popen(
                 cmd_list,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                encoding='utf-8',
                 env=test_env,
-                shell=False  # Safe: disable shell to prevent command injection
+                shell=False  # 安全：禁用 shell 防止命令注入
             )
 
-            # Wait 3 seconds to check startup status
+            # 等待 3 秒检测启动状态
             import time
             time.sleep(3)
 
-            # Check process status
+            # 检查进程状态
             poll_result = process.poll()
 
             if poll_result is None:
-                # Process still running = successful startup
-                success(f"Server '{name}' started successfully! Process ID: {process.pid}")
+                # 进程仍在运行 = 成功启动
+                success(f"服务器 '{name}' 启动成功！进程 ID: {process.pid}")
                 process.terminate()
                 try:
                     process.wait(timeout=2)
                 except subprocess.TimeoutExpired:
-                    # terminate() timeout, force kill
+                    # terminate() 超时，强制终止
                     process.kill()
                     process.wait()
             elif poll_result == 0:
-                success(f"Server '{name}' exited normally after startup (return code: 0)")
+                success(f"服务器 '{name}' 启动后正常退出（返回码: 0）")
             else:
-                # Process exited abnormally
-                warn(f"Server '{name}' failed to start (return code: {poll_result})")
+                # 进程异常退出
+                warn(f"服务器 '{name}' 启动失败（返回码: {poll_result}）")
                 stderr_output = process.stderr.read()
                 if stderr_output:
-                    print(f"\nError output:\n{stderr_output}")
+                    print(f"\n错误输出:\n{stderr_output}")
 
         except FileNotFoundError:
-            error(f"Command not found: {command}")
-            info("Please ensure command path is correct or corresponding tool is installed")
+            error(f"未找到命令: {command}")
+            info("请确保命令路径正确或已安装相应工具")
         except Exception as e:
-            error(f"Test failed: {e}")
+            error(f"测试失败: {e}")
 
 
 # =============================================================================
-# CLI Entry
+# CLI 入口
 # =============================================================================
 
 def main():
     parser = argparse.ArgumentParser(
-        description="MCP Server Manager - Unified management of Model Context Protocol servers",
+        description="MCP 服务器管理器 - 统一管理 Model Context Protocol 服务器",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
-  # List all MCP servers
+示例:
+  # 列出所有 MCP 服务器
   python bin/mcp_manager.py list
 
-  # Add preset template (no key required)
+  # 添加预设模板（无需 key）
   python bin/mcp_manager.py add context7
 
-  # Add preset template (key required) - command line parameter
+  # 添加预设模板（需要 key）- 命令行参数
   python bin/mcp_manager.py add tavily --env TAVILY_API_KEY=your_key
 
-  # Add preset template (key required) - interactive input
+  # 添加预设模板（需要 key）- 交互式输入
   python bin/mcp_manager.py add tavily -i
 
-  # Add custom server
+  # 添加自定义服务器
   python bin/mcp_manager.py add custom --command npx --args "@org/server@latest" --env API_KEY=xxx
 
-  # Remove server
+  # 移除服务器
   python bin/mcp_manager.py remove tavily
 
-  # Test connection
+  # 测试连接
   python bin/mcp_manager.py test context7
         """
     )
 
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    subparsers = parser.add_subparsers(dest="command", help="可用命令")
 
-    # list command
-    subparsers.add_parser("list", help="List all MCP servers and status")
+    # list 命令
+    subparsers.add_parser("list", help="列出所有 MCP 服务器及状态")
 
-    # add command
-    add_parser = subparsers.add_parser("add", help="Add new MCP server")
-    add_parser.add_argument("name", help="Server name (preset template name or 'custom')")
-    add_parser.add_argument("--command", help="Custom server command")
-    add_parser.add_argument("--args", nargs="+", help="Custom server arguments")
-    add_parser.add_argument("--env", action="append", help="Environment variables (KEY=VALUE)")
-    add_parser.add_argument("-i", "--interactive", action="store_true", help="Interactive API Key input")
+    # add 命令
+    add_parser = subparsers.add_parser("add", help="添加新的 MCP 服务器")
+    add_parser.add_argument("name", help="服务器名称（预设模板名或 'custom'）")
+    add_parser.add_argument("--command", help="自定义服务器命令")
+    add_parser.add_argument("--args", nargs="+", help="自定义服务器参数")
+    add_parser.add_argument("--env", action="append", help="环境变量 (KEY=VALUE)")
+    add_parser.add_argument("-i", "--interactive", action="store_true", help="交互式输入 API Key")
 
-    # remove command
-    remove_parser = subparsers.add_parser("remove", help="Remove MCP server")
-    remove_parser.add_argument("name", help="Server name")
+    # remove 命令
+    remove_parser = subparsers.add_parser("remove", help="移除 MCP 服务器")
+    remove_parser.add_argument("name", help="服务器名称")
 
-    # test command
-    test_parser = subparsers.add_parser("test", help="Test MCP server connection")
-    test_parser.add_argument("name", help="Server name")
+    # test 命令
+    test_parser = subparsers.add_parser("test", help="测试 MCP 服务器连接")
+    test_parser.add_argument("name", help="服务器名称")
 
     args = parser.parse_args()
 
@@ -738,9 +739,9 @@ Examples:
         manager.list_servers()
     elif args.command == "add":
         if args.name == "custom":
-            # Custom server
+            # 自定义服务器
             if not args.command or not args.args:
-                error("Custom server requires --command and --args parameters")
+                error("自定义服务器需要 --command 和 --args 参数")
                 return 1
             manager.add_server(
                 name=f"custom_{datetime.now().strftime('%Y%m%d%H%M%S')}",
@@ -751,7 +752,7 @@ Examples:
                 is_custom=True
             )
         else:
-            # Preset template
+            # 预设模板
             manager.add_preset(args.name, args.env or [], args.interactive)
     elif args.command == "remove":
         manager.remove_server(args.name)

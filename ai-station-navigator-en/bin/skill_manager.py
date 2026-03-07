@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-skill_manager.py - Skill Manager
+skill_manager.py - Skill Manager (技能管理器)
 ----------------------------------------------
-Manages skill installation, uninstallation, conversion, and verification
+技能的安装、卸载、转换和验证管理
 
-Responsibilities:
-1. Format Detection - Detect input skill format type (GitHub/local/.skill pack)
-2. Normalization Conversion - Convert non-standard formats to official SKILL.md format
-3. Structure Verification - Verify converted skill structure integrity
-4. Auto Installation - Copy to .claude/skills/ and verify availability
-5. Auto Uninstallation - Delete skills and sync database status
+职责：
+1. 格式检测 - 检测输入技能的格式类型（GitHub/本地/.skill包）
+2. 标准化转换 - 将非标准格式转换为官方 SKILL.md 格式
+3. 结构验证 - 验证转换后的技能结构完整性
+4. 自动安装 - 复制到 .claude/skills/ 并验证可用性
+5. 自动卸载 - 删除技能并同步数据库状态
 
 Architecture:
     Kernel (AI) → Skill Manager → Format Detector → Normalizer → Installer
@@ -18,17 +18,17 @@ Source: Inspired by Anthropic's skill-creator (Apache 2.0)
 https://github.com/anthropics/skills/tree/main/skills/skill-creator
 
 v1.0 - Feature Complete:
-    - Support multiple input sources (GitHub URL, local directory, .skill pack)
-    - Auto-detect and fix common format issues
-    - Batch conversion support
-    - Complete verification workflow
+    - 支持多种输入源（GitHub URL、本地目录、.skill 包）
+    - 自动检测和修复常见格式问题
+    - 批量转换支持
+    - 完整的验证流程
 """
 
 import argparse
 import sys
 import os
 
-# Windows UTF-8 Compatibility (P0 - All scripts must include)
+# Windows UTF-8 兼容 (P0 - 所有脚本必须包含)
 if sys.platform == 'win32':
     try:
         sys.stdout.reconfigure(encoding='utf-8')
@@ -54,12 +54,12 @@ from urllib.parse import urlparse
 import tempfile
 import yaml
 
-# Add project lib directory to sys.path (green package bundled dependencies)
+# 添加项目 lib 目录到 sys.path（绿色包预置依赖）
 _lib_dir = Path(__file__).parent.parent / "lib"
 if _lib_dir.exists():
     sys.path.insert(0, str(_lib_dir))
 
-# Add bin directory to sys.path (only for hooks_manager)
+# 添加 bin 目录到 sys.path（仅用于 hooks_manager）
 _bin_dir = Path(__file__).parent
 if str(_bin_dir) not in sys.path:
     sys.path.insert(0, str(_bin_dir))
@@ -73,12 +73,12 @@ except ImportError:
     TINYDB_AVAILABLE = False
 
 # =============================================================================
-# Decoupling Note: No longer directly import clone_manager and security_scanner
-# Call these independent modules via subprocess
+# 解耦说明：不再直接导入 clone_manager 和 security_scanner
+# 通过 subprocess 调用这些独立模块
 # =============================================================================
 
 # =============================================================================
-# Configuration Constants
+# 配置常量
 # =============================================================================
 
 BASE_DIR = Path(__file__).parent.parent
@@ -87,55 +87,55 @@ TEMP_DIR = BASE_DIR / "mybox" / "temp"
 SKILLS_DB_FILE = BASE_DIR / ".claude" / "skills" / "skills.db"
 CACHE_DIR = BASE_DIR / "mybox" / "cache" / "repos"
 
-# Official skill standards
+# 官方技能标准
 REQUIRED_FIELDS = ["name", "description"]
 SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
 MAX_NAME_LENGTH = 128
 MAX_DESC_LENGTH = 1024
 
-# Processing threshold constants
-SINGLE_SKILL_THRESHOLD = 1          # Single skill judgment threshold
-FRONTMATTER_PREVIEW_LINES = 10      # frontmatter preview lines
-LIST_DESC_PREVIEW_CHARS = 500       # List command description preview characters
+# 处理阈值常量
+SINGLE_SKILL_THRESHOLD = 1          # 单技能判断阈值
+FRONTMATTER_PREVIEW_LINES = 10      # frontmatter 预览行数
+LIST_DESC_PREVIEW_CHARS = 500       # 列表命令描述预览字符数
 
-# Skill default value constants
-DEFAULT_SKILL_DESC = "No description"       # Default skill description
-DEFAULT_SKILL_CATEGORY = "utilities"  # Default category
-DEFAULT_SKILL_TAGS = ["skill"]      # Default tags
+# 技能默认值常量
+DEFAULT_SKILL_DESC = "无描述"       # 默认技能描述
+DEFAULT_SKILL_CATEGORY = "utilities"  # 默认分类
+DEFAULT_SKILL_TAGS = ["skill"]      # 默认标签
 
 # =============================================================================
-# Format Registry
+# 格式注册表 (Format Registry)
 # =============================================================================
-# Register format handlers here when adding new format support
-# See: docs/skill-formats-contribution-guide.md for details
+# 添加新格式支持时，在此处注册格式处理器
+# 详细说明见: docs/skill-formats-contribution-guide.md
 
 SUPPORTED_FORMATS = {
     "official": {
         "name": "Claude Code Official",
         "markers": ["SKILL.md"],
-        "handler": None,  # Official format handled directly
+        "handler": None,  # 官方格式直接处理
     },
     "claude-plugin": {
         "name": "Claude Plugin",
         "markers": [".claude-plugin", "plugin.json", "marketplace.json"],
-        "handler": None,  # Built-in handling
+        "handler": None,  # 内置处理
     },
     "agent-skills": {
         "name": "Anthropic Agent Skills",
         "markers": ["skills/", "SKILL.md"],
-        "handler": None,  # Built-in handling
+        "handler": None,  # 内置处理
     },
     "cursor-rules": {
         "name": "Cursor Rules",
         "markers": [".cursor", "rules/"],
-        "handler": None,  # Built-in handling
+        "handler": None,  # 内置处理
     },
     "plugin-marketplace": {
         "name": "Plugin Marketplace",
         "markers": ["plugins/", "MARKETPLACE.md"],
-        "handler": None,  # Built-in handling
+        "handler": None,  # 内置处理
     },
-    # Add new formats here, for example:
+    # 新格式在这里添加，例如:
     # "cursor-plugin": {
     #     "name": "Cursor Plugin",
     #     "markers": ["package.json"],
@@ -145,18 +145,18 @@ SUPPORTED_FORMATS = {
 
 
 # =============================================================================
-# Temporary Directory Cleanup Utility
+# 临时目录清理工具
 # =============================================================================
 
 def cleanup_old_install_dirs(max_age_hours: int = 24) -> int:
     """
-    Clean up installer_* temporary directories older than specified time
+    清理超过指定时间的 installer_* 临时目录
 
     Args:
-        max_age_hours: Maximum retention time (hours), default 24 hours
+        max_age_hours: 最大保留时间（小时），默认 24 小时
 
     Returns:
-        Number of directories cleaned
+        清理的目录数量
     """
     if not TEMP_DIR.exists():
         return 0
@@ -165,7 +165,7 @@ def cleanup_old_install_dirs(max_age_hours: int = 24) -> int:
     current_time = time.time()
     max_age_seconds = max_age_hours * 3600
 
-    # Find all installer_* directories
+    # 查找所有 installer_* 目录
     installer_dirs = list(TEMP_DIR.glob("installer_*"))
 
     for install_dir in installer_dirs:
@@ -173,24 +173,24 @@ def cleanup_old_install_dirs(max_age_hours: int = 24) -> int:
             continue
 
         try:
-            # Check directory age
+            # 检查目录年龄
             dir_age = current_time - install_dir.stat().st_mtime
             if dir_age > max_age_seconds:
                 shutil.rmtree(install_dir, ignore_errors=True)
                 cleaned_count += 1
-                # info(f"Cleaned old temp directory: {install_dir.name}")  # P0 fix: info() not defined yet (L238)
+                # info(f"清理旧临时目录: {install_dir.name}")  # P0 fix: info() 尚未定义 (L238)
         except Exception:
-            pass  # P0 fix: Logging function not defined yet, skip silently
+            pass  # P0 fix: 日志函数尚未定义，静默跳过
 
     return cleaned_count
 
 
 # =============================================================================
-# Logging Utilities (plain text)
+# 日志工具 (纯文本)
 # =============================================================================
 
 def log(level: str, message: str, emoji: str = ""):
-    """Unified log output"""
+    """统一日志输出"""
     timestamp = datetime.now().strftime("%H:%M:%S")
     print(f"[{timestamp}] {emoji} [{level}] {message}")
 
@@ -218,30 +218,30 @@ def header(msg: str):
 
 
 # =============================================================================
-# Format Detector (independent implementation, decoupled from clone_manager)
+# 格式检测器 (独立实现，解耦于 clone_manager)
 # =============================================================================
 
 class FormatDetector:
-    """Detect format type of skill input source"""
+    """检测技能输入源的格式类型"""
 
     @staticmethod
     def validate_github_url(url: str) -> Tuple[bool, Optional[str]]:
         """
-        Validate GitHub URL format security, prevent config injection attacks
+        验证 GitHub URL 格式安全性，防止配置注入攻击
 
         Args:
-            url: GitHub URL to validate
+            url: 待验证的 GitHub URL
 
         Returns:
-            (is_valid, error_message)
+            (是否有效, 错误信息)
         """
         import re
-        # Basic format check
+        # 基础格式检查
         github_pattern = r'^https?://github\.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+(?:/tree/[^/\s]+(?:/[\w\-./]+)?)?$'
         if not re.match(github_pattern, url):
-            return False, f"Invalid GitHub URL format: {url}"
+            return False, f"无效的 GitHub URL 格式: {url}"
 
-        # Check for dangerous git config injection patterns
+        # 检查危险的 git 配置注入模式
         dangerous_patterns = [
             '--config=', '-c=', '--upload-pack=', '--receive-pack=',
             '--exec=', '&&', '||', '|', '`', '$(', '\n', '\r', '\x00',
@@ -250,39 +250,39 @@ class FormatDetector:
         url_lower = url.lower()
         for pattern in dangerous_patterns:
             if pattern in url_lower:
-                return False, f"URL contains dangerous character or pattern: {pattern}"
+                return False, f"URL 包含危险字符或模式: {pattern}"
 
-        # Check for URL encoding bypass attempts
+        # 检查 URL 编码绕过尝试
         if '%2' in url.lower():
-            return False, "URL contains suspicious encoded characters"
+            return False, "URL 包含可疑的编码字符"
 
         return True, None
 
     @staticmethod
     def detect_input_type(input_source: str) -> Tuple[str, str, Optional[str]]:
         """
-        Detect input source type
+        检测输入源类型
 
         Returns:
-            (type, path/URL, subpath)
+            (类型, 路径/URL, 子路径)
         """
         from urllib.parse import urlparse
 
-        info(f"Detecting input source: {input_source}")
+        info(f"检测输入源: {input_source}")
 
-        # 1. Check if it's a GitHub URL
+        # 1. 检查是否是 GitHub URL
         if input_source.startswith(("http://", "https://")):
             parsed = urlparse(input_source)
             if "github.com" in parsed.netloc:
                 return "github", input_source, None
 
-        # 1.5 Check if it's a GitHub shorthand (user/repo)
+        # 1.5 检查是否是 GitHub 简写 (user/repo)
         if "/" in input_source and not input_source.startswith((".", "/", "\\")):
             parts = input_source.split("/")
             if len(parts) == 2 and not any(c in input_source for c in ":\\"):
                 return "github", f"https://github.com/{input_source}", None
 
-        # 2. Check if it's a local path
+        # 2. 检查是否是本地路径
         local_path = Path(input_source).expanduser().resolve()
         if local_path.exists():
             if local_path.is_file() and local_path.suffix == ".skill":
@@ -290,7 +290,7 @@ class FormatDetector:
             elif local_path.is_dir():
                 return "local", str(local_path), None
 
-        # 3. Check if it's a relative path
+        # 3. 检查是否是相对路径
         relative_path = BASE_DIR / input_source
         if relative_path.exists():
             if relative_path.is_file() and relative_path.suffix == ".skill":
@@ -298,21 +298,21 @@ class FormatDetector:
             elif relative_path.is_dir():
                 return "local", str(relative_path), None
 
-        warn("Unable to recognize input source type, trying as local directory")
+        warn("无法识别输入源类型，尝试作为本地目录处理")
         return "unknown", input_source, None
 
     @staticmethod
     def detect_skill_format(skill_dir: Path) -> Tuple[str, List[str]]:
         """
-        Detect skill directory format type
+        检测技能目录的格式类型
 
         Returns:
-            (format_type, detected_marker_files)
-            format: 'official', 'claude-plugin', 'agent-skills', 'cursor-rules', 'unknown'
+            (格式类型, 检测到的标记文件)
+            格式: 'official', 'claude-plugin', 'agent-skills', 'cursor-rules', 'unknown'
         """
         detected_markers = []
 
-        # Check official format
+        # 检查官方格式
         skill_md = skill_dir / "SKILL.md"
         if skill_md.exists():
             try:
@@ -321,10 +321,10 @@ class FormatDetector:
                     if "---" in first_lines and "name:" in first_lines:
                         return "official", ["SKILL.md"]
             except (OSError, IOError) as e:
-                # P1 fix: Silent skip on file read failure, continue detecting other formats
+                # P1 fix: 文件读取失败时静默跳过，继续检测其他格式
                 pass
 
-        # Check third-party format markers
+        # 检查第三方格式标记
         for format_type, format_data in SUPPORTED_FORMATS.items():
             if format_type == "official":
                 continue
@@ -337,7 +337,7 @@ class FormatDetector:
             if found:
                 return format_type, found
 
-        # Check if there are markdown files (might be old format)
+        # 检查是否有 markdown 文件（可能是旧格式）
         md_files = list(skill_dir.glob("*.md"))
         if md_files:
             return "unknown-md", [f.name for f in md_files]
@@ -346,37 +346,37 @@ class FormatDetector:
 
 
 # =============================================================================
-# Project Validator - Check if it's a skill repository
+# 项目验证器 - 检测是否为技能仓库
 # =============================================================================
 
 class ProjectValidator:
-    """Verify if project is a skill repository, not a tool/application"""
+    """验证项目是否为技能仓库，而非工具/应用程序"""
 
-    # Skill repository positive indicators (root directory) - priority check
+    # 技能仓库的正面指示（根目录）- 优先检查
     SKILL_REPO_INDICATORS = [
-        ("SKILL.md", "Root directory has SKILL.md file"),
-        ("_has_skills_dir", "skills/ directory contains multiple skills"),  # Special marker
-        (".claude/skills", "Anthropic official skill repository structure"),
-        # .skill pack files (might have multiple, check with glob)
+        ("SKILL.md", "根目录有 SKILL.md 文件"),
+        ("_has_skills_dir", "skills/ 目录包含多个技能"),  # 特殊标记
+        (".claude/skills", "Anthropic 官方技能仓库结构"),
+        # .skill 包文件（可能有多个，用 glob 检查）
     ]
 
-    # Skill pack repository indicators (containing .skill files)
+    # 技能包仓库指示（包含 .skill 文件）
     SKILL_PACKAGE_EXTENSIONS = [".skill"]
 
-    # Tool project indicator files (root directory) - streamline to most common
+    # 工具项目的指示文件（根目录）- 精简到最常见的
     TOOL_PROJECT_FILES = [
-        "setup.py",        # Python package configuration
-        "Cargo.toml",      # Rust project
-        "go.mod",          # Go project
+        "setup.py",        # Python 包配置
+        "Cargo.toml",      # Rust 项目
+        "go.mod",          # Go 项目
     ]
 
-    # Files needing further check (might be skill or tool)
+    # 需要进一步检查的文件（可能是技能或工具）
     AMBIGUOUS_PROJECT_FILES = [
-        "pyproject.toml",  # Might be skill packaging or tool
-        "package.json",    # Might be skill or Node.js project
+        "pyproject.toml",  # 可能是技能打包，也可能是工具
+        "package.json",    # 可能是技能，也可能是 Node.js 项目
     ]
 
-    # Tool component directory names (not skills) - streamline to most common
+    # 工具组件目录名（不是技能）- 精简到最常见的
     TOOL_COMPONENT_NAMES = {
         "api", "src", "lib", "core", "utils",
         "scripts", "tools", "bin", "build", "target",
@@ -384,7 +384,7 @@ class ProjectValidator:
         ".git", ".github",
     }
 
-    # Non-skill project keywords (detect in README) - streamline to most common
+    # 非技能项目的关键词（在 README 中检测）- 精简到最常见的
     NON_SKILL_KEYWORDS = [
         "skill generator",
         "generates skills",
@@ -394,7 +394,7 @@ class ProjectValidator:
         "cli tool",
     ]
 
-    # Skill project positive indicator words (README)
+    # 技能项目的正面指示词（README）
     SKILL_INDICATORS = [
         "claude skill",
         "claude.ai skill",
@@ -407,32 +407,32 @@ class ProjectValidator:
     @staticmethod
     def is_skill_repo_root(repo_dir: Path) -> Tuple[bool, str]:
         """
-        Judge if root directory is a skill repository
+        判断根目录是否是技能仓库
 
         Returns:
             (is_skill, reason)
         """
-        # 1. Check skill repository positive indicators (highest priority)
+        # 1. 检查技能仓库正面指示（优先级最高）
         for indicator, reason in ProjectValidator.SKILL_REPO_INDICATORS:
             if indicator == "_has_skills_dir":
-                # Special handling: check if skills/ directory contains skills
+                # 特殊处理：检查 skills/ 目录是否包含技能
                 skills_dir = repo_dir / "skills"
                 if skills_dir.exists() and skills_dir.is_dir():
-                    # Check if has 3+ SKILL.md
+                    # 检查是否有 3+ 个 SKILL.md
                     skill_count = len(list(skills_dir.glob("*/SKILL.md")))
                     if skill_count >= 3:
-                        return True, f"skills/ directory contains {skill_count} skills"
+                        return True, f"skills/ 目录包含 {skill_count} 个技能"
             elif (repo_dir / indicator).exists():
                 return True, f"{reason}"
 
-        # 2. Check if has .skill pack files (skill pack repository)
+        # 2. 检查是否有 .skill 包文件（技能包仓库）
         for ext in ProjectValidator.SKILL_PACKAGE_EXTENSIONS:
             skill_files = list(repo_dir.glob(f"*{ext}"))
             if skill_files:
-                return True, f"Contains skill pack file: {skill_files[0].name}"
+                return True, f"包含技能包文件: {skill_files[0].name}"
 
-        # 2.5 New: Check if subdirectories contain multiple skills (monorepo support)
-        # Check subdirectories before judging as tool project
+        # 2.5 新增：检查子目录是否包含多个技能（monorepo 支持）
+        # 在判定为工具项目之前，先检查子目录
         sub_skill_dirs = []
         exclude_dirs = {
             "tests", "test", "testing", "spec", "specs",
@@ -440,10 +440,10 @@ class ProjectValidator:
             "scripts", "tools", "bin", "build", "dist", "target",
             ".git", ".github", ".vscode", ".idea",
         }
-        # Special priority: don't exclude skills/ directory
+        # 特殊优先级：skills/ 目录不排除
         for item in repo_dir.iterdir():
             if item.is_dir() and not item.name.startswith("."):
-                # skills/ directory special handling: check subdirectories for skills
+                # skills/ 目录特殊处理：检查子目录中的技能
                 if item.name == "skills":
                     skill_count = 0
                     for sub_item in item.iterdir():
@@ -451,113 +451,113 @@ class ProjectValidator:
                             sub_skill_dirs.append(sub_item)
                             skill_count += 1
                     if skill_count >= 2:
-                        return True, f"skills/ directory contains {skill_count} skills (monorepo)"
+                        return True, f"skills/ 目录包含 {skill_count} 个技能（monorepo）"
                 elif item.name not in exclude_dirs:
-                    # Check if it's a skill directory (has SKILL.md or matches skill naming convention)
+                    # 检查是否是技能目录（有 SKILL.md 或符合技能命名规范）
                     if (item / "SKILL.md").exists():
                         sub_skill_dirs.append(item)
                     elif re.match(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$", item.name):
-                        # Check if has markdown files (might be skill content)
+                        # 检查是否有 markdown 文件（可能是技能内容）
                         md_files = list(item.glob("*.md"))
                         if md_files:
                             sub_skill_dirs.append(item)
 
-        # If has 2+ sub-skill directories, judge as skill repository
+        # 如果有 2+ 个子技能目录，判定为技能仓库
         if len(sub_skill_dirs) >= 2:
-            return True, f"Subdirectories contain {len(sub_skill_dirs)} skills (monorepo)"
+            return True, f"子目录包含 {len(sub_skill_dirs)} 个技能（monorepo）"
 
-        # 3. Check explicit tool project files
+        # 3. 检查明确的工具项目文件
         for tool_file in ProjectValidator.TOOL_PROJECT_FILES:
             if (repo_dir / tool_file).exists():
-                return False, f"Detected tool project file: {tool_file}"
+                return False, f"检测到工具项目文件: {tool_file}"
 
-        # 4. Check ambiguous project files (need further judgment)
+        # 4. 检查模糊的项目文件（需要进一步判断）
         for ambiguous_file in ProjectValidator.AMBIGUOUS_PROJECT_FILES:
             file_path = repo_dir / ambiguous_file
             if file_path.exists():
-                # For these files, need to check content and README
+                # 对于这些文件，需要检查内容和 README
                 if ambiguous_file == "pyproject.toml":
                     content = file_path.read_text(encoding="utf-8", errors="ignore")
-                    # Check if explicitly a tool project
+                    # 检查是否明确是工具项目
                     if "tool.scripts" in content or "command-line" in content.lower():
-                        return False, f"Detected tool project configuration: {ambiguous_file}"
-                    # If has [project] and is a tool (not skill packaging), check subdirectories
+                        return False, f"检测到工具项目配置: {ambiguous_file}"
+                    # 如果有 [project] 且是工具（不是技能打包），检查子目录
                     if "[project]" in content:
-                        # Check if subdirectories are all tool components
+                        # 检查子目录是否都是工具组件
                         subdirs = [d.name for d in repo_dir.iterdir() if d.is_dir() and not d.name.startswith(".")]
                         tool_components = ProjectValidator.TOOL_COMPONENT_NAMES & set(subdirs)
-                        # If most subdirectories are tool components, judge as tool project
+                        # 如果子目录大多是工具组件，判定为工具项目
                         if len(tool_components) >= 2 and len(tool_components) >= len(subdirs) * 0.5:
-                            return False, f"Detected tool project structure (contains tool component directories)"
-                    # If just build configuration, continue checking README
+                            return False, f"检测到工具项目结构（包含工具组件目录）"
+                    # 如果只是构建配置，继续检查 README
                 elif ambiguous_file == "package.json":
                     content = file_path.read_text(encoding="utf-8", errors="ignore")
-                    # If has many scripts, might be Node.js tool
+                    # 如果有很多 scripts，可能是 Node.js 工具
                     if '"scripts"' in content and content.count('"') > 20:
-                        return False, f"Detected Node.js tool project: {ambiguous_file}"
+                        return False, f"检测到 Node.js 工具项目: {ambiguous_file}"
 
-        # 5. Check README content (key judgment)
+        # 5. 检查 README 内容（关键判断）
         readme = ProjectValidator._read_readme(repo_dir)
         if readme:
             content_lower = readme.lower()
 
-            # Prioritize checking skill positive indicators
+            # 优先检查技能正面指示词
             for indicator in ProjectValidator.SKILL_INDICATORS:
                 if indicator in content_lower:
-                    return True, f"README contains skill indicator: {indicator}"
+                    return True, f"README 包含技能指示词: {indicator}"
 
-            # Check for tool keywords
+            # 检查工具关键词
             for keyword in ProjectValidator.NON_SKILL_KEYWORDS:
                 if keyword in content_lower:
-                    return False, f"README contains tool project keyword: {keyword}"
+                    return False, f"README 包含工具项目关键词: {keyword}"
 
-        # 6. Check directory structure
+        # 6. 检查目录结构
         subdirs = [d.name for d in repo_dir.iterdir() if d.is_dir() and not d.name.startswith(".")]
-        # If has typical tool project directory structure
+        # 如果有典型的工具项目目录结构
         tool_dirs = ProjectValidator.TOOL_COMPONENT_NAMES & set(subdirs)
         if len(tool_dirs) >= 2:
-            return False, f"Detected tool project directory structure: {', '.join(list(tool_dirs)[:3])}"
+            return False, f"检测到工具项目目录结构: {', '.join(list(tool_dirs)[:3])}"
 
-        # Default: uncertain, assume possibly a skill repository
+        # 默认：不确定，假定可能是技能仓库
         return True, ""
 
     @staticmethod
     def is_skill_directory(subdir: Path) -> Tuple[bool, str]:
         """
-        Judge if subdirectory is a skill directory
+        判断子目录是否是技能目录
 
         Returns:
             (is_skill, reason)
         """
         dirname = subdir.name.lower()
 
-        # 1. Check if it's a tool component directory
+        # 1. 检查是否是工具组件目录
         if dirname in ProjectValidator.TOOL_COMPONENT_NAMES:
-            return False, f"Directory name is tool component: {dirname}"
+            return False, f"目录名是工具组件: {dirname}"
 
-        # 2. Check if has SKILL.md (clearest skill marker)
+        # 2. 检查是否有 SKILL.md（最明确的技能标志）
         if (subdir / "SKILL.md").exists():
-            return True, "Contains SKILL.md file"
+            return True, "包含 SKILL.md 文件"
 
-        # 3. Check if it's a Python package directory (has __init__.py but no SKILL.md)
+        # 3. 检查是否是 Python 包目录（有 __init__.py 但无 SKILL.md）
         if (subdir / "__init__.py").exists():
-            return False, "Python package directory (no SKILL.md)"
+            return False, "Python 包目录（无 SKILL.md）"
 
-        # 4. Check directory name format: skill names are usually kebab-case
+        # 4. 检查目录名格式：技能名通常是 kebab-case
         if not re.match(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$", dirname):
-            return False, f"Directory name doesn't match skill naming convention: {dirname}"
+            return False, f"目录名不符合技能命名规范: {dirname}"
 
-        # 5. Check if has .md files (might be skill content)
+        # 5. 检查是否有 .md 文件（可能是技能内容）
         md_files = list(subdir.glob("*.md"))
         if not md_files:
-            return False, "No markdown files found"
+            return False, "没有找到 markdown 文件"
 
-        # Default: might be a skill
+        # 默认：可能是技能
         return True, ""
 
     @staticmethod
     def _read_readme(directory: Path) -> str:
-        """Read README file content"""
+        """读取 README 文件内容"""
         for readme_name in ["README.md", "README.txt", "README.rst", "readme.md"]:
             readme_path = directory / readme_name
             if readme_path.exists():
@@ -567,25 +567,25 @@ class ProjectValidator:
     @staticmethod
     def validate_root_repo(repo_dir: Path, repo_name: str, force: bool = False) -> bool:
         """
-        Verify if root repository is a skill repository
+        验证根仓库是否是技能仓库
 
         Returns:
-            bool - True means continue, False means abort
+            bool - True 表示继续，False 表示中止
         """
         is_skill, reason = ProjectValidator.is_skill_repo_root(repo_dir)
 
         if not is_skill:
             print("=" * 60)
-            print("[X] Refuse to install: this is not a skill project")
+            print("❌ 拒绝安装：这不是技能项目")
             print("=" * 60)
             print()
-            print(f"Detection reason: {reason}")
-            print(f"Repository: {repo_name}")
+            print(f"检测原因: {reason}")
+            print(f"仓库: {repo_name}")
             print()
-            print("System does not support installing tool projects.")
-            print("Please confirm:")
-            print(f"  1. Is it a tool/library? Use pip/npm/cargo etc. to install")
-            print(f"  2. Really need it as a skill? Manually convert then install")
+            print("系统不支持安装工具项目。")
+            print("请确认：")
+            print(f"  1. 是否为工具/库？请使用 pip/npm/cargo 等安装")
+            print(f"  2. 确实需要作为技能？请手动转换后安装")
 
             return False
 
@@ -594,7 +594,7 @@ class ProjectValidator:
     @staticmethod
     def validate_subdirectory(subdir: Path, force: bool = False) -> Tuple[bool, str]:
         """
-        Verify if subdirectory is a skill directory
+        验证子目录是否是技能目录
 
         Returns:
             (should_install, skip_reason)
@@ -608,50 +608,50 @@ class ProjectValidator:
 
 
 # =============================================================================
-# Skill Normalizer
+# 技能标准化器
 # =============================================================================
 
 class SkillNormalizer:
-    """Normalize various formats to official SKILL.md format"""
+    """将各种格式标准化为官方 SKILL.md 格式"""
 
     @staticmethod
     def validate_skill_name(name: str) -> Tuple[bool, str]:
-        """Verify if skill name complies with specification"""
+        """验证技能名称是否符合规范"""
         if not name:
-            return False, "Skill name cannot be empty"
+            return False, "技能名称不能为空"
 
         if len(name) > MAX_NAME_LENGTH:
-            return False, f"Skill name too long (maximum {MAX_NAME_LENGTH} characters)"
+            return False, f"技能名称过长（最多 {MAX_NAME_LENGTH} 字符）"
 
         if not SKILL_NAME_PATTERN.match(name):
-            return False, "Skill name must be lowercase letters, numbers and hyphens, cannot start or end with hyphen"
+            return False, "技能名称必须是小写字母、数字和连字符，不能以连字符开头或结尾"
 
         return True, ""
 
 
     @staticmethod
     def validate_description(desc: str) -> Tuple[bool, str]:
-        """Verify if description complies with specification"""
+        """验证描述是否符合规范"""
         if not desc:
-            return False, "Description cannot be empty"
+            return False, "描述不能为空"
 
         if len(desc) > MAX_DESC_LENGTH:
-            return False, f"Description too long (maximum {MAX_DESC_LENGTH} characters)"
+            return False, f"描述过长（最多 {MAX_DESC_LENGTH} 字符）"
 
-        # Check if contains potential HTML tags (more precise pattern)
-        # Allow individual < and > characters (like >5, C++, <3), but reject <tag> format
+        # 检查是否包含潜在的 HTML 标签（更精确的模式）
+        # 允许单独的 < 和 > 字符（如 >5, C++, <3），但拒绝 <tag> 格式
         if re.search(r'<[^>]+>', desc):
-            return False, "Description cannot contain HTML tags"
+            return False, "描述不能包含 HTML 标签"
 
         return True, ""
 
 
     @staticmethod
     def normalize_skill_name(original_name: str) -> str:
-        """Normalize any name to hyphen-case format"""
-        # Remove special characters, convert to lowercase, join with hyphens
+        """将任意名称标准化为 hyphen-case 格式"""
+        # 移除特殊字符，转为小写，用连字符连接
         normalized = re.sub(r"[^a-zA-Z0-9]+", "-", original_name).strip("-").lower()
-        # Remove leading numbers
+        # 移除开头的数字
         if normalized and normalized[0].isdigit():
             normalized = "skill-" + normalized
         return normalized or "unnamed-skill"
@@ -660,24 +660,24 @@ class SkillNormalizer:
     @staticmethod
     def extract_frontmatter(content: str) -> Dict[str, Any]:
         """
-        Extract YAML frontmatter from SKILL.md
+        从 SKILL.md 提取 YAML frontmatter
 
-        Support YAML parsing, fallback to manual parsing on failure
+        支持 YAML 解析，失败时降级为手动解析
         """
         if not content.startswith("---"):
             return {}
 
-        # Find second --- (compatible with \n--- and --- formats)
+        # 找到第二个 --- (兼容 \n--- 和 --- 两种格式)
         end_marker = content.find("\n---", 4)
         if end_marker == -1:
             end_marker = content.find("---", 3)
         if end_marker <= 0:
             return {}
 
-        # Extract frontmatter content
+        # 提取 frontmatter 内容
         yaml_content = content[4:end_marker].strip()
 
-        # Prioritize using yaml.safe_load
+        # 优先使用 yaml.safe_load
         try:
             frontmatter = yaml.safe_load(yaml_content)
             if isinstance(frontmatter, dict):
@@ -685,7 +685,7 @@ class SkillNormalizer:
         except (yaml.YAMLError, Exception):
             pass
 
-        # Fallback: manual parsing (handle simple key: value format)
+        # 降级：手动解析（处理简单 key: value 格式）
         result = {}
         for line in yaml_content.split('\n'):
             if ':' in line and not line.strip().startswith('#'):
@@ -697,58 +697,58 @@ class SkillNormalizer:
     @staticmethod
     def fix_frontmatter(skill_dir: Path) -> Tuple[bool, str]:
         """
-        Fix SKILL.md frontmatter
+        修复 SKILL.md 的 frontmatter
 
         Returns:
-            (needs_fix, fixed content or error message)
+            (是否需要修复, 修复后的内容或错误信息)
         """
         skill_md = skill_dir / "SKILL.md"
 
         if not skill_md.exists():
-            return False, "SKILL.md does not exist"
+            return False, "SKILL.md 不存在"
 
         with open(skill_md, "r", encoding="utf-8") as f:
             content = f.read()
 
         frontmatter = SkillNormalizer.extract_frontmatter(content)
 
-        # Check required fields
+        # 检查必需字段
         needs_fix = False
         if "name" not in frontmatter:
-            # Use folder name as name
+            # 使用文件夹名作为 name
             folder_name = skill_dir.name
             normalized_name = SkillNormalizer.normalize_skill_name(folder_name)
             frontmatter["name"] = normalized_name
             needs_fix = True
 
         if "description" not in frontmatter:
-            # Try extracting description from content
+            # 尝试从内容中提取描述
             desc = SkillNormalizer._extract_description_from_content(content)
             frontmatter["description"] = desc
             needs_fix = True
 
         if not needs_fix:
-            # Validate existing fields
+            # 验证现有字段
             valid, msg = SkillNormalizer.validate_skill_name(frontmatter.get("name", ""))
             if not valid:
-                warn(f"Invalid skill name: {msg}, auto-fixing")
+                warn(f"技能名称无效: {msg}，自动修复")
                 frontmatter["name"] = SkillNormalizer.normalize_skill_name(skill_dir.name)
                 needs_fix = True
 
             valid, msg = SkillNormalizer.validate_description(frontmatter.get("description", ""))
             if not valid:
-                warn(f"Invalid description: {msg}, auto-fixing")
-                frontmatter["description"] = "Skill description (please manually complete)"
+                warn(f"描述无效: {msg}，自动修复")
+                frontmatter["description"] = "技能描述（请手动完善）"
                 needs_fix = True
 
         if needs_fix:
-            # Rebuild frontmatter
+            # 重建 frontmatter
             new_frontmatter = "---\n"
             new_frontmatter += f'name: {frontmatter["name"]}\n'
             new_frontmatter += f'description: "{frontmatter["description"]}"\n'
             new_frontmatter += "---\n\n"
 
-            # Keep original content (remove old frontmatter)
+            # 保留原有内容（移除旧 frontmatter）
             content_start = content.find("\n---", 4)
             if content_start != -1:
                 old_content = content[content_start + 5:].lstrip("\n")
@@ -762,73 +762,73 @@ class SkillNormalizer:
 
     @staticmethod
     def _extract_description_from_content(content: str) -> str:
-        """Extract description from content"""
+        """从内容中提取描述"""
         lines = content.split("\n")
 
-        # Skip frontmatter
+        # 跳过 frontmatter
         start_idx = 0
         for i, line in enumerate(lines):
             if line.strip() == "---" and i > 0:
                 start_idx = i + 1
                 break
 
-        # Find first heading or paragraph
+        # 查找第一个标题或段落
         for i in range(start_idx, min(start_idx + 10, len(lines))):
             line = lines[i].strip()
             if line and not line.startswith("#"):
-                # Return first non-empty line as description (limit length)
+                # 返回第一个非空行作为描述（限制长度）
                 return line[:200] + "..." if len(line) > 200 else line
 
-        return "Auto-generated skill description, please manually complete"
+        return "自动生成的技能描述，请手动完善"
 
 
     @staticmethod
     def convert_to_official_format(source_dir: Path, target_dir: Path) -> Tuple[bool, str]:
         """
-        Convert third-party format to official format
+        将第三方格式转换为官方格式
 
         Returns:
-            (success, message)
+            (成功, 消息)
         """
-        info(f"Converting skill: {source_dir.name}")
+        info(f"转换技能: {source_dir.name}")
 
-        # 1. Detect format
+        # 1. 检测格式
         format_type, markers = FormatDetector.detect_skill_format(source_dir)
-        info(f"Detected format: {format_type}")
+        info(f"检测到格式: {format_type}")
 
         # 2. 创建目标目录
         target_dir.mkdir(parents=True, exist_ok=True)
 
-        # 3. Process according to format
+        # 3. 根据格式处理
         if format_type == "official":
-            # Already official format, direct copy
+            # 已经是官方格式，直接复制
             SkillNormalizer._copy_directory(source_dir, target_dir)
         elif format_type == "claude-plugin":
-            # Claude Plugin format
+            # Claude Plugin 格式
             SkillNormalizer._convert_claude_plugin(source_dir, target_dir)
         elif format_type == "agent-skills":
-            # Agent Skills format
+            # Agent Skills 格式
             SkillNormalizer._convert_agent_skills(source_dir, target_dir)
         elif format_type == "cursor-rules":
-            # Cursor Rules format
+            # Cursor Rules 格式
             SkillNormalizer._convert_cursor_rules(source_dir, target_dir)
         else:
-            # Unknown format, try generic conversion
+            # 未知格式，尝试通用转换
             SkillNormalizer._convert_generic(source_dir, target_dir)
 
-        # 4. Fix frontmatter
+        # 4. 修复 frontmatter
         needs_fix, new_content = SkillNormalizer.fix_frontmatter(target_dir)
         if needs_fix:
-            info("Fixing SKILL.md frontmatter")
+            info("修复 SKILL.md frontmatter")
             with open(target_dir / "SKILL.md", "w", encoding="utf-8") as f:
                 f.write(new_content)
 
-        return True, f"Conversion complete: {target_dir.name}"
+        return True, f"转换完成: {target_dir.name}"
 
 
     @staticmethod
     def _copy_directory(source: Path, target: Path) -> None:
-        """Copy directory content"""
+        """复制目录内容"""
         if target.exists():
             shutil.rmtree(target)
         shutil.copytree(source, target, dirs_exist_ok=True)
@@ -836,20 +836,20 @@ class SkillNormalizer:
 
     @staticmethod
     def _convert_claude_plugin(source: Path, target: Path) -> None:
-        """Convert Claude Plugin format"""
-        # Find SKILL.md or README.md
+        """转换 Claude Plugin 格式"""
+        # 查找 SKILL.md 或 README.md
         skill_md = source / "SKILL.md"
         if skill_md.exists():
             shutil.copy2(skill_md, target / "SKILL.md")
         else:
-            # Generate SKILL.md from plugin.json or marketplace.json
+            # 从 plugin.json 或 marketplace.json 生成 SKILL.md
             plugin_json = source / ".claude-plugin" / "plugin.json"
             if plugin_json.exists():
                 SkillNormalizer._generate_from_plugin_json(plugin_json, target)
             else:
                 SkillNormalizer._create_default_skill_md(source, target)
 
-        # Copy other resources
+        # 复制其他资源
         for item in source.iterdir():
             if item.name.startswith("."):
                 continue
@@ -864,13 +864,13 @@ class SkillNormalizer:
 
     @staticmethod
     def _convert_agent_skills(source: Path, target: Path) -> None:
-        """Convert Agent Skills format"""
-        # Agent Skills usually already have SKILL.md
+        """转换 Agent Skills 格式"""
+        # Agent Skills 通常已经有 SKILL.md
         skill_md = source / "SKILL.md"
         if skill_md.exists():
             shutil.copy2(skill_md, target / "SKILL.md")
 
-        # Copy scripts/, references/, examples/ and other directories
+        # 复制 scripts/, references/, examples/ 等目录
         for subdir in ["scripts", "references", "examples", "templates"]:
             src_subdir = source / subdir
             if src_subdir.exists():
@@ -879,14 +879,14 @@ class SkillNormalizer:
 
     @staticmethod
     def _convert_cursor_rules(source: Path, target: Path) -> None:
-        """Convert Cursor Rules format"""
-        # Cursor's rules/ directory usually contains .md files
+        """转换 Cursor Rules 格式"""
+        # Cursor 的 rules/ 目录通常包含 .md 文件
         rules_dir = source / ".cursor" / "rules"
         if not rules_dir.exists():
             rules_dir = source / "rules"
 
         if rules_dir.exists():
-            # Merge all .md files
+            # 合并所有 .md 文件
             content_parts = []
             for md_file in sorted(rules_dir.glob("*.md")):
                 with open(md_file, "r", encoding="utf-8") as f:
@@ -902,15 +902,15 @@ class SkillNormalizer:
 
     @staticmethod
     def _convert_generic(source: Path, target: Path) -> None:
-        """Generic conversion (unknown format)"""
-        # Find SKILL.md or README.md
+        """通用转换（未知格式）"""
+        # 查找 SKILL.md 或 README.md
         skill_md = source / "SKILL.md"
         readme_md = source / "README.md"
 
         if skill_md.exists():
             shutil.copy2(skill_md, target / "SKILL.md")
         elif readme_md.exists():
-            # Generate SKILL.md from README.md
+            # 从 README.md 生成 SKILL.md
             with open(readme_md, "r", encoding="utf-8") as f:
                 content = f.read()
             SkillNormalizer._create_skill_md_from_content(target, source.name, content)
@@ -920,10 +920,10 @@ class SkillNormalizer:
 
     @staticmethod
     def _create_skill_md_from_content(target: Path, name: str, content: str) -> None:
-        """Create SKILL.md from content"""
+        """从内容创建 SKILL.md"""
         normalized_name = SkillNormalizer.normalize_skill_name(name)
 
-        # Extract description (first paragraph)
+        # 提取描述（第一段）
         desc = SkillNormalizer._extract_description_from_content(content)
 
         frontmatter = f"""---
@@ -939,12 +939,12 @@ description: "{desc}"
 
     @staticmethod
     def _create_default_skill_md(source: Path, target: Path) -> None:
-        """Create default SKILL.md"""
+        """创建默认的 SKILL.md"""
         name = SkillNormalizer.normalize_skill_name(source.name)
 
         content = f"""---
 name: {name}
-description: "Skill auto-converted from {source.name}, please manually complete description"
+description: "从 {source.name} 自动转换的技能，请手动完善描述"
 ---
 
 # {name.replace('-', ' ').title()}
@@ -1027,7 +1027,7 @@ description: "{description}"
 
 
 # =============================================================================
-# Skill Installer
+# 技能安装器
 # =============================================================================
 
 
@@ -1036,7 +1036,7 @@ if TINYDB_AVAILABLE:
         """自定义 JSONStorage，强制使用 UTF-8 编码（修复 Windows GBK 问题）"""
 
         def __init__(self, path, **kwargs):
-            # Force UTF-8 encoding
+            # 强制使用 UTF-8 编码
             kwargs['encoding'] = 'utf-8'
             super().__init__(path, **kwargs)
 else:
@@ -1044,7 +1044,7 @@ else:
 
 
 # =============================================================================
-# Database Connection Manager
+# 数据库连接管理器
 # =============================================================================
 
 from contextlib import contextmanager
@@ -1052,11 +1052,11 @@ from contextlib import contextmanager
 @contextmanager
 def db_connection():
     """
-    Database connection context manager
+    数据库连接上下文管理器
 
-    Usage:
+    用法:
         with db_connection() as (db, Skill):
-            # Use db and Skill
+            # 使用 db 和 Skill
             result = db.search(Skill.name == "test")
     """
     if not TINYDB_AVAILABLE:
@@ -1069,17 +1069,17 @@ def db_connection():
         db = TinyDB(SKILLS_DB_FILE, storage=UTF8JSONStorage)
         yield db, Query()
     except Exception as e:
-        warn(f"Database connection failed: {e}")
+        warn(f"数据库连接失败: {e}")
         yield None, None
 
 
 # =============================================================================
-# Skill Installer
+# 技能安装器
 # =============================================================================
 
 
 class SkillInstaller:
-    """Install converted skills to .claude/skills/"""
+    """将转换后的技能安装到 .claude/skills/"""
 
     @staticmethod
     def _extract_github_info(github_url: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:

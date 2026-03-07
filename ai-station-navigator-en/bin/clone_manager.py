@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-clone_manager.py - GitHub Repository Clone Manager
+clone_manager.py - GitHub 仓库克隆管理器
 -----------------------------------------
-Responsible for cloning skill repositories from GitHub to local staging area
+负责从 GitHub 克隆技能仓库到本地暂存空间
 
-Responsibilities:
-1. GitHub repository cloning (with accelerator support)
-2. Remote repository analysis (pre-check, caching)
-3. Skill directory extraction
-4. Repository cache management
+职责:
+1. GitHub 仓库克隆（支持加速器）
+2. 远程仓库分析（预检、缓存）
+3. 技能目录提取
+4. 仓库缓存管理
 
 Architecture:
     skill_manager → clone_manager → security_scanner
                        ↓
-                  Staging Space (mybox/cache/repos/)
+                  暂存空间 (mybox/cache/repos/)
 
 Source: Refactored from skill_manager.py (Apache 2.0)
 """
@@ -22,7 +22,7 @@ import argparse
 import sys
 import os
 
-# Windows UTF-8 Compatibility (P0 - All scripts must include)
+# Windows UTF-8 兼容 (P0 - 所有脚本必须包含)
 if sys.platform == 'win32':
     try:
         sys.stdout.reconfigure(encoding='utf-8')
@@ -51,52 +51,51 @@ import urllib.error
 import yaml
 
 # =============================================================================
-# Path Configuration
+# 路径配置
 # =============================================================================
 
 BASE_DIR = Path(__file__).parent.parent
 CACHE_DIR = BASE_DIR / "mybox" / "cache" / "repos"
 TEMP_DIR = BASE_DIR / "mybox" / "temp"
 
-# Skill default value constants
-DEFAULT_SKILL_DESC = "No description"
+# 技能默认值常量
+DEFAULT_SKILL_DESC = "无描述"
 DEFAULT_SKILL_CATEGORY = "utilities"
 DEFAULT_SKILL_TAGS = ["skill"]
 
-# Add project lib directory to sys.path (green package bundled dependencies)
+# 添加项目 lib 目录到 sys.path（绿色包预置依赖）
 _lib_dir = Path(__file__).parent.parent / "lib"
 if _lib_dir.exists():
     sys.path.insert(0, str(_lib_dir))
 
-# Add bin directory to sys.path (for importing other modules)
+# 添加 bin 目录到 sys.path（用于导入其他模块）
 _bin_dir = Path(__file__).parent
 if str(_bin_dir) not in sys.path:
     sys.path.insert(0, str(_bin_dir))
 
-
 # =============================================================================
-# Logging Utilities
+# 日志工具
 # =============================================================================
 
 def log(level: str, message: str, emoji: str = ""):
-    """Unified log output"""
+    """统一的日志输出"""
     timestamp = datetime.now().strftime("%H:%M:%S")
     print(f"{timestamp} [{level}] {emoji} {message}")
 
 def success(msg: str):
-    log("SUCCESS", msg, "[OK]")
+    log("SUCCESS", msg, "✅")
 
 def info(msg: str):
-    log("INFO", msg, "[i]")
+    log("INFO", msg, "🔄")
 
 def warn(msg: str):
-    log("WARN", msg, "[!]")
+    log("WARN", msg, "⚠️")
 
 def error(msg: str):
-    log("ERROR", msg, "[X]")
+    log("ERROR", msg, "❌")
 
 # =============================================================================
-# Configuration Loading (shared)
+# 配置加载（共享）
 # =============================================================================
 
 _config_cache: Optional[dict] = None
@@ -104,27 +103,27 @@ _config_mtime: Optional[float] = None
 
 def load_config(use_cache: bool = True) -> dict:
     """
-    Load configuration file (with cache support)
+    加载配置文件（支持缓存）
 
-    Configuration file priority (in order):
-    1. <BASE_DIR>/config.json (recommended, JSON format)
-    2. <BASE_DIR>/.claude/config/config.yml (backward compatible, YAML format)
+    配置文件优先级（按顺序）：
+    1. <BASE_DIR>/config.json（推荐，JSON格式）
+    2. <BASE_DIR>/.claude/config/config.yml（向后兼容，YAML格式）
 
     Args:
-        use_cache: Whether to use cache (default True)
+        use_cache: 是否使用缓存（默认 True）
 
     Returns:
-        Configuration dictionary
+        配置字典
     """
     global _config_cache, _config_mtime
 
-    # Configuration file path list (by priority)
+    # 配置文件路径列表（按优先级）
     config_files = [
         BASE_DIR / "config.json",
         BASE_DIR / ".claude" / "config" / "config.yml"
     ]
 
-    # Find existing configuration file
+    # 查找存在的配置文件
     config_file = None
     for cf in config_files:
         if cf.exists():
@@ -134,13 +133,13 @@ def load_config(use_cache: bool = True) -> dict:
     if not config_file:
         return {}
 
-    # Check cache validity
+    # 检查缓存有效性
     if use_cache and _config_cache is not None:
         current_mtime = config_file.stat().st_mtime
         if current_mtime == _config_mtime:
             return _config_cache
 
-    # Load configuration (choose method based on file type)
+    # 加载配置（根据文件类型选择加载方式）
     try:
         with open(config_file, "r", encoding="utf-8") as f:
             if config_file.suffix == ".json":
@@ -150,17 +149,17 @@ def load_config(use_cache: bool = True) -> dict:
             _config_mtime = config_file.stat().st_mtime
             return _config_cache
     except Exception as e:
-        warn(f"Configuration file load failed: {e}")
+        warn(f"配置文件加载失败: {e}")
         return {}
 
 def clear_config_cache() -> None:
-    """Clear configuration cache"""
+    """清除配置缓存"""
     global _config_cache, _config_mtime
     _config_cache = None
     _config_mtime = None
 
 def get_git_proxies() -> list:
-    """Get Git accelerator list"""
+    """获取 Git 加速器列表"""
     config = load_config()
     return config.get("git", {}).get("proxies", [
         "https://ghp.ci/{repo}",
@@ -168,12 +167,12 @@ def get_git_proxies() -> list:
     ])
 
 def get_ssl_verify() -> bool:
-    """Get SSL verification setting"""
+    """获取 SSL 验证设置"""
     config = load_config()
     return config.get("git", {}).get("ssl_verify", True)
 
 def get_raw_proxies() -> list:
-    """Get Raw URL accelerator list"""
+    """获取 Raw URL 加速器列表"""
     config = load_config()
     return config.get("raw", {}).get("proxies", [
         "https://ghp.ci/{path}",
@@ -181,29 +180,29 @@ def get_raw_proxies() -> list:
     ])
 
 # =============================================================================
-# Format Detector
+# 格式检测器
 # =============================================================================
 
 class FormatDetector:
-    """Detect format type of input source"""
+    """检测输入源的格式类型"""
 
     @staticmethod
     def validate_github_url(url: str) -> Tuple[bool, Optional[str]]:
         """
-        Validate GitHub URL format security, prevent config injection attacks
+        验证 GitHub URL 格式安全性，防止配置注入攻击
 
         Args:
-            url: GitHub URL to validate
+            url: 待验证的 GitHub URL
 
         Returns:
-            (is_valid, error_message)
+            (是否有效, 错误信息)
         """
-        # Basic format check
+        # 基础格式检查
         github_pattern = r'^https?://github\.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+(?:/tree/[^/\s]+(?:/[\w\-./]+)?)?/?$'
         if not re.match(github_pattern, url):
-            return False, f"Invalid GitHub URL format: {url}"
+            return False, f"无效的 GitHub URL 格式: {url}"
 
-        # Check for dangerous git config injection patterns
+        # 检查危险的 git 配置注入模式
         dangerous_patterns = [
             '--config=', '-c=', '--upload-pack=', '--receive-pack=',
             '--exec=', '&&', '||', '|', '`', '$(', '\n', '\r', '\x00',
@@ -212,30 +211,30 @@ class FormatDetector:
         url_lower = url.lower()
         for pattern in dangerous_patterns:
             if pattern in url_lower:
-                return False, f"URL contains dangerous character or pattern: {pattern}"
+                return False, f"URL 包含危险字符或模式: {pattern}"
 
-        # Check for URL encoding bypass attempts
+        # 检查 URL 编码绕过尝试
         if '%2' in url.lower():
-            return False, "URL contains suspicious encoded characters"
+            return False, "URL 包含可疑的编码字符"
 
         return True, None
 
     @staticmethod
     def parse_github_subpath(github_url: str) -> Tuple[str, Optional[str]]:
         """
-        Parse GitHub URL, extract subpath
+        解析 GitHub URL，提取子路径
 
         Returns:
-            (repo_url, subpath)
+            (仓库URL, 子路径)
         """
         is_valid, error_msg = FormatDetector.validate_github_url(github_url)
         if not is_valid:
-            raise ValueError(f"GitHub URL security validation failed: {error_msg}")
+            raise ValueError(f"GitHub URL 安全验证失败: {error_msg}")
 
         parsed = urlparse(github_url)
         path_parts = parsed.path.strip('/').split('/')
 
-        # Find /tree/ separator
+        # 查找 /tree/ 分隔符
         if 'tree' in path_parts:
             tree_idx = path_parts.index('tree')
             if tree_idx >= 2:
@@ -250,29 +249,29 @@ class FormatDetector:
     @staticmethod
     def detect_input_type(input_source: str) -> Tuple[str, str, Optional[str]]:
         """
-        Detect input source type
+        检测输入源类型
 
         Returns:
-            (type, path/URL, subpath)
+            (类型, 路径/URL, 子路径)
         """
-        info(f"Detecting input source: {input_source}")
+        info(f"检测输入源: {input_source}")
 
-        # 1. Check if it's a GitHub URL
+        # 1. 检查是否是 GitHub URL
         if input_source.startswith(("http://", "https://")):
             parsed = urlparse(input_source)
             if "github.com" in parsed.netloc:
                 repo_url, subpath = FormatDetector.parse_github_subpath(input_source)
                 if subpath:
-                    info(f"Detected subpath: {subpath}")
+                    info(f"检测到子路径: {subpath}")
                 return "github", repo_url, subpath
 
-        # 1.5 Check if it's a GitHub shorthand (user/repo)
+        # 1.5 检查是否是 GitHub 简写 (user/repo)
         if "/" in input_source and not input_source.startswith((".", "/", "\\")):
             parts = input_source.split("/")
             if len(parts) == 2 and not any(c in input_source for c in ":\\"):
                 return "github", f"https://github.com/{input_source}", None
 
-        # 2. Check if it's a local path
+        # 2. 检查是否是本地路径
         local_path = Path(input_source).expanduser().resolve()
         if local_path.exists():
             if local_path.is_file() and local_path.suffix == ".skill":
@@ -280,7 +279,7 @@ class FormatDetector:
             elif local_path.is_dir():
                 return "local", str(local_path), None
 
-        # 3. Check if it's a relative path
+        # 3. 检查是否是相对路径
         relative_path = BASE_DIR / input_source
         if relative_path.exists():
             if relative_path.is_file() and relative_path.suffix == ".skill":
@@ -288,19 +287,19 @@ class FormatDetector:
             elif relative_path.is_dir():
                 return "local", str(relative_path), None
 
-        warn("Unable to recognize input source type, trying as local directory")
+        warn("无法识别输入源类型，尝试作为本地目录处理")
         return "unknown", input_source, None
 
 # =============================================================================
-# Skill Normalizer (extract required parts)
+# 技能标准化器（提取所需部分）
 # =============================================================================
 
 class SkillNormalizer:
-    """Normalize various formats to official SKILL.md format"""
+    """将各种格式标准化为官方 SKILL.md 格式"""
 
     @staticmethod
     def extract_frontmatter(content: str) -> Dict[str, Any]:
-        """Extract YAML frontmatter from SKILL.md"""
+        """从 SKILL.md 提取 YAML frontmatter"""
         if not content.startswith("---"):
             return {}
 
@@ -319,7 +318,7 @@ class SkillNormalizer:
         except (yaml.YAMLError, Exception):
             pass
 
-        # Fallback: manual parsing
+        # 降级：手动解析
         result = {}
         for line in yaml_content.split('\n'):
             if ':' in line and not line.strip().startswith('#'):
@@ -328,11 +327,11 @@ class SkillNormalizer:
         return result
 
 # =============================================================================
-# Project Validator
+# 项目验证器
 # =============================================================================
 
 class ProjectValidator:
-    """Verify if project is a skill repository"""
+    """验证项目是否为技能仓库"""
 
     TOOL_PROJECT_FILES = [
         "setup.py", "Cargo.toml", "go.mod",
@@ -343,11 +342,11 @@ class ProjectValidator:
     ]
 
 # =============================================================================
-# Skill Pack Handler
+# 技能包处理器
 # =============================================================================
 
 class SkillPackHandler:
-    """Handle .skill skill pack"""
+    """处理 .skill 技能包"""
 
     @staticmethod
     def extract_pack(pack_file: Path, extract_dir: Path) -> Tuple[bool, Optional[Path]]:
@@ -366,11 +365,11 @@ class SkillPackHandler:
             return False, None
 
 # =============================================================================
-# Remote Skill Analyzer
+# 远程技能分析器
 # =============================================================================
 
 class RemoteSkillAnalyzer:
-    """Analyze skill information from remote GitHub repository"""
+    """分析远程 GitHub 仓库的技能信息"""
 
     API_BASE = "https://api.github.com"
     RAW_BASE = "https://raw.githubusercontent.com"
@@ -378,8 +377,8 @@ class RemoteSkillAnalyzer:
     def __init__(self, repo: str, branch: str = "main", token: Optional[str] = None):
         """
         Args:
-            repo: user/repo format
-            branch: Branch name
+            repo: user/repo 格式
+            branch: 分支名
             token: GitHub personal access token
         """
         self.repo = repo
@@ -392,7 +391,7 @@ class RemoteSkillAnalyzer:
         self._working_proxy = None
 
     def analyze(self) -> Dict[str, Any]:
-        """Analyze repository, return skill information"""
+        """分析仓库，返回技能信息"""
         result = {
             "repo": self.repo,
             "branch": "main",
@@ -406,7 +405,7 @@ class RemoteSkillAnalyzer:
             meta = RepoCacheManager.load_meta(cache_dir)
             if meta and meta.get("url") == self.github_url:
                 result["source"] = "cache"
-                info(f"Using local cache for analysis: {self.repo}")
+                info(f"使用本地缓存分析: {self.repo}")
                 return self._analyze_from_cache(cache_dir, result)
 
         # 网络探测
@@ -414,7 +413,7 @@ class RemoteSkillAnalyzer:
         return self._analyze_from_network(result)
 
     def _analyze_from_cache(self, cache_dir: Path, result: Dict) -> Dict:
-        """Analyze repository from local cache"""
+        """从本地缓存分析仓库"""
         skills = []
         for skill_md in cache_dir.rglob("SKILL.md"):
             rel_path = skill_md.relative_to(cache_dir)
@@ -433,10 +432,10 @@ class RemoteSkillAnalyzer:
         return result
 
     def _analyze_from_network(self, result: Dict) -> Dict:
-        """Analyze repository via network"""
+        """通过网络分析仓库"""
         skills = []
 
-        # Detect branches
+        # 检测分支
         branches_to_try = ["main", "master"]
         found_branch = None
 
@@ -460,7 +459,7 @@ class RemoteSkillAnalyzer:
                 root_info["url"] = self.github_url
                 skills.append(root_info)
 
-        # Explore sub-skills
+        # 探测子技能
         sub_skill_paths = self._discover_skill_paths()
         for path in sub_skill_paths:
             content = self.fetch_file(path)
@@ -476,11 +475,11 @@ class RemoteSkillAnalyzer:
         return result
 
     def _discover_skill_paths(self) -> List[str]:
-        """Explore sub-skill SKILL.md paths"""
+        """探测子技能 SKILL.md 路径"""
         skill_paths = []
         checked = set()
 
-        # Common skill names
+        # 常见技能名称
         common_names = [
             "commit", "review-pr", "pdf", "web-search", "image-analysis",
             "doc-coauthoring", "copywriting", "email-sequence", "popup-cro",
@@ -507,7 +506,7 @@ class RemoteSkillAnalyzer:
         return sorted(skill_paths)
 
     def _parse_skill_md(self, content: str, file_path: str) -> Optional[Dict]:
-        """Parse SKILL.md content"""
+        """解析 SKILL.md 内容"""
         frontmatter = SkillNormalizer.extract_frontmatter(content)
 
         name = frontmatter.get("name", "")
@@ -720,30 +719,30 @@ class RepoCacheManager:
 
     @staticmethod
     def _sanitize_url(url: str) -> str:
-        """Convert URL to safe directory name"""
+        """将 URL 转换为安全的目录名"""
         clean = url.replace("https://", "").replace("http://", "")
         clean = clean.replace("/", "_").replace("\\", "_")
         return clean[:100]
 
     @staticmethod
     def _get_cache_dir(github_url: str) -> Path:
-        """Get cache directory for repository"""
+        """获取仓库的缓存目录"""
         cache_name = RepoCacheManager._sanitize_url(github_url)
         return CACHE_DIR / cache_name
 
     @staticmethod
     def _get_meta_file(cache_dir: Path) -> Path:
-        """Get cache metadata file path"""
+        """获取缓存元数据文件路径"""
         return cache_dir / ".meta.json"
 
     @staticmethod
     def _get_last_cloned_file() -> Path:
-        """Get last cloned repository marker file path"""
+        """获取最后克隆的仓库标记文件路径"""
         return TEMP_DIR / ".last_cloned_repo"
 
     @staticmethod
     def write_last_cloned(cache_dir_name: str) -> None:
-        """Write last cloned repository marker (for scan-cache location)"""
+        """写入最后克隆的仓库标记（用于 scan-cache 定位）"""
         last_cloned_file = RepoCacheManager._get_last_cloned_file()
         TEMP_DIR.mkdir(parents=True, exist_ok=True)
         with open(last_cloned_file, "w", encoding="utf-8") as f:
@@ -751,7 +750,7 @@ class RepoCacheManager:
 
     @staticmethod
     def load_meta(cache_dir: Path) -> Optional[Dict]:
-        """Load cache metadata"""
+        """加载缓存元数据"""
         meta_file = RepoCacheManager._get_meta_file(cache_dir)
         if meta_file.exists():
             try:
@@ -763,7 +762,7 @@ class RepoCacheManager:
 
     @staticmethod
     def save_meta(cache_dir: Path, meta: Dict):
-        """Save cache metadata"""
+        """保存缓存元数据"""
         meta_file = RepoCacheManager._get_meta_file(cache_dir)
         cache_dir.mkdir(parents=True, exist_ok=True)
         with open(meta_file, "w", encoding="utf-8") as f:
@@ -779,30 +778,30 @@ class RepoCacheManager:
         install_params: Optional[Dict] = None
     ) -> Tuple[bool, Optional[Path], str]:
         """
-        Get repository (prioritize from cache)
+        获取仓库（优先从缓存）
 
         Args:
-            github_url: GitHub repository URL
-            force_refresh: Whether to force refresh cache
-            timeout: Timeout (seconds)
-            user_input: User's original input URL/path
-            requested_skill: User specified skill_name
-            install_params: Other installation parameters
+            github_url: GitHub 仓库 URL
+            force_refresh: 是否强制刷新缓存
+            timeout: 超时时间（秒）
+            user_input: 用户原始输入的 URL/路径
+            requested_skill: 用户指定的 skill_name
+            install_params: 安装时的其他参数
 
         Returns:
-            (success, repository_path, message)
+            (成功, 仓库路径, 消息)
         """
         cache_dir = RepoCacheManager._get_cache_dir(github_url)
 
-        # 1. Check if cache exists
+        # 1. 检查缓存是否存在
         if cache_dir.exists() and not force_refresh:
             meta = RepoCacheManager.load_meta(cache_dir)
             if meta and meta.get("url") == github_url:
-                # Update meta (user may request with different parameters again)
+                # 更新 meta（用户可能用不同参数再次请求）
                 updated_meta = meta.copy()
-                # Always update user_input (keep latest complete URL)
+                # 始终更新 user_input（保留最新的完整 URL）
                 updated_meta["user_input"] = user_input or github_url
-                # If requested_skill not specified, try extracting from user_input
+                # 如果没有指定 requested_skill，尝试从 user_input 提取
                 if requested_skill is None and user_input:
                     _, subpath = FormatDetector.parse_github_subpath(user_input)
                     if subpath:
@@ -815,38 +814,38 @@ class RepoCacheManager:
                 updated_meta["last_accessed"] = datetime.now().isoformat()
                 RepoCacheManager.save_meta(cache_dir, updated_meta)
 
-                # Write last cloned repository marker
+                # 写入最后克隆的仓库标记
                 RepoCacheManager.write_last_cloned(cache_dir.name)
 
                 cached_time = meta.get("cached_at", "")
-                return True, cache_dir, f"Using cache (cached at {cached_time})"
+                return True, cache_dir, f"使用缓存 (缓存于 {cached_time})"
 
-        # 2. Cache doesn't exist or force refresh, execute clone
-        info(f"Cloning repository to cache: {github_url}")
+        # 2. 缓存不存在或强制刷新，执行克隆
+        info(f"克隆仓库到缓存: {github_url}")
 
-        # If old cache exists, delete first
+        # 如果旧缓存存在，先删除
         if cache_dir.exists():
             try:
                 shutil.rmtree(cache_dir, ignore_errors=False)
             except Exception as e:
-                error(f"Cannot delete cache directory, please delete manually and retry: {cache_dir}")
-                error(f"Error message: {e}")
-                return False, None, f"Cache cleanup failed: {e}"
+                error(f"无法删除缓存目录，请手动删除后重试: {cache_dir}")
+                error(f"错误信息: {e}")
+                return False, None, f"缓存清理失败: {e}"
 
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-        # Execute clone
+        # 执行克隆
         clone_ok, _ = GitHubHandler.clone_repo(github_url, cache_dir)
 
         if not clone_ok:
-            return False, None, "Repository does not exist or path is incorrect, please confirm:\n1. Repository URL is correct\n2. Is it a sub-skill (try using --skill parameter)\n3. Check mapping table: docs/skills-mapping.md"
+            return False, None, "仓库不存在或路径错误，请确认:\n1. 仓库 URL 是否正确\n2. 是否为子技能（尝试使用 --skill 参数）\n3. 查看映射表: docs/skills-mapping.md"
 
-        # Save metadata (includes author and repo information)
-        # Extract author and repo from URL
+        # 保存元数据（包含 author 和 repo 信息）
+        # 从 URL 解析 author 和 repo
         author, repo, _ = _extract_github_info(github_url)
 
-        # Fix: Ensure user_input prioritizes passed value (keep original complete URL)
-        # Only fallback to github_url when completely None
+        # 修复: 确保 user_input 优先使用传入值（保留原始完整 URL）
+        # 只有在完全为 None 时才回退到 github_url
         final_user_input = user_input if user_input is not None else github_url
 
         meta = {
@@ -862,10 +861,10 @@ class RepoCacheManager:
         }
         RepoCacheManager.save_meta(cache_dir, meta)
 
-        # Write last cloned repository marker
+        # 写入最后克隆的仓库标记
         RepoCacheManager.write_last_cloned(cache_dir.name)
 
-        return True, cache_dir, "Cache created successfully"
+        return True, cache_dir, "缓存创建成功"
 
     @staticmethod
     def list_cache() -> List[Dict]:

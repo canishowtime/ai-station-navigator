@@ -1,199 +1,199 @@
-# Skill System Quick Start
+# 技能系统快速上手
 
-**Version**: v2.6 | **Updated**: 2026-02-04
+**版本**: v2.6 | **更新**: 2026-02-04
 
 ---
 
-## System Navigation
+## 系统导航
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    AI Station Navigator                   │
-│                    Skill System Navigation                │
+│                       技能系统导航                          │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
-│  📥 [Skill Management]   → guides/skill-manager-guide.md │
-│  🔌 [MCP Management]     → guides/mcp-manager-guide.md   │
-│  📋 [Command Registry]   → commands.md                   │
-│  📁 [Filesystem]         → filesystem.md                 │
+│  📥 [技能管理]     → guides/skill-manager-guide.md      │
+│  🔌 [MCP 管理]     → guides/mcp-manager-guide.md        │
+│  📋 [命令注册表]   → commands.md                        │
+│  📁 [文件系统]     → filesystem.md                      │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Core Command Reference
+## 核心命令速查
 
-### Skill Management
+### 技能管理
 
-| Command | Description | Detailed Docs |
+| 命令 | 说明 | 详细文档 |
 |:---|:---|:---|
-| `python bin/skill_manager.py list` | List installed skills | [skill-manager-guide](./guides/skill-manager-guide.md) |
-| `python bin/skill_manager.py search <keyword>` | Search skills | [skill-manager-guide](./guides/skill-manager-guide.md) |
-| `python bin/skill_manager.py install <local_path>` | Install skill | [skill-manager-guide](./guides/skill-manager-guide.md) |
-| `python bin/skill_manager.py uninstall <name>` | Uninstall skill | [skill-manager-guide](./guides/skill-manager-guide.md) |
+| `python bin/skill_manager.py list` | 列出已安装技能 | [skill-manager-guide](./guides/skill-manager-guide.md) |
+| `python bin/skill_manager.py search <关键词>` | 搜索技能 | [skill-manager-guide](./guides/skill-manager-guide.md) |
+| `python bin/skill_manager.py install <本地路径>` | 安装技能 | [skill-manager-guide](./guides/skill-manager-guide.md) |
+| `python bin/skill_manager.py uninstall <名称>` | 卸载技能 | [skill-manager-guide](./guides/skill-manager-guide.md) |
 
-### MCP Server Management
+### MCP 服务器管理
 
-| Command | Description | Detailed Docs |
+| 命令 | 说明 | 详细文档 |
 |:---|:---|:---|
-| `python bin/mcp_manager.py list` | List MCP servers | [mcp-manager-guide](./guides/mcp-manager-guide.md) |
-| `python bin/mcp_manager.py add <template_name>` | Add preset server | [mcp-manager-guide](./guides/mcp-manager-guide.md) |
-| `python bin/mcp_manager.py remove <name>` | Remove server | [mcp-manager-guide](./guides/mcp-manager-guide.md) |
-| `python bin/mcp_manager.py test <name>` | Test connection | [mcp-manager-guide](./guides/mcp-manager-guide.md) |
+| `python bin/mcp_manager.py list` | 列出 MCP 服务器 | [mcp-manager-guide](./guides/mcp-manager-guide.md) |
+| `python bin/mcp_manager.py add <模板名>` | 添加预设服务器 | [mcp-manager-guide](./guides/mcp-manager-guide.md) |
+| `python bin/mcp_manager.py remove <名称>` | 移除服务器 | [mcp-manager-guide](./guides/mcp-manager-guide.md) |
+| `python bin/mcp_manager.py test <名称>` | 测试连接 | [mcp-manager-guide](./guides/mcp-manager-guide.md) |
 
-### GitHub Source Handling
+### GitHub 源处理
 
-| Command | Description |
+| 命令 | 说明 |
 |:---|:---|
-| `python bin/clone_manager.py clone <URL>` | Clone GitHub repo to cache |
+| `python bin/clone_manager.py clone <URL>` | 克隆 GitHub 仓库到缓存 |
 
 ---
 
-## Quick Workflows
+## 快速工作流
 
-### Install GitHub Skill
+### 安装 GitHub 技能
 
 ```bash
-# Step 1: Clone repository
+# 步骤 1: 克隆仓库
 python bin/clone_manager.py clone https://github.com/user/repo
 
-# Step 2: Install skill (from cache)
+# 步骤 2: 安装技能（从缓存）
 python bin/skill_manager.py install mybox/cache/repos/user-repo/skill-name
 ```
 
-### Add MCP Server
+### 添加 MCP 服务器
 
 ```bash
-# No API Key needed
+# 无需 API Key
 python bin/mcp_manager.py add context7
 
-# API Key required (interactive input)
+# 需要 API Key（交互式输入）
 python bin/mcp_manager.py add tavily -i
 
-# API Key required (command line parameter)
+# 需要 API Key（命令行参数）
 python bin/mcp_manager.py add tavily --env TAVILY_API_KEY=xxx
 ```
 
 ---
 
-## Supported Skill Formats
+## 支持的技能格式
 
-| Format | Description | Status |
+| 格式 | 说明 | 状态 |
 |:---|:---|:---:|
-| **Official** | Claude Code official format (SKILL.md) | ✅ |
-| **Claude Plugin** | Claude plugin format | ✅ |
+| **Official** | Claude Code 官方格式 (SKILL.md) | ✅ |
+| **Claude Plugin** | Claude 插件格式 | ✅ |
 | **Agent Skills** | Anthropic Agent Skills | ✅ |
-| **Cursor Rules** | Cursor rules file | ✅ |
+| **Cursor Rules** | Cursor 规则文件 | ✅ |
 
-View all formats: `python bin/skill_manager.py formats`
+查看所有格式：`python bin/skill_manager.py formats`
 
 ---
 
-## MCP Preset Templates
+## MCP 预设模板
 
-| Template | Description | Key Required |
+| 模板 | 描述 | 需要 Key |
 |:---|:---|:---:|
-| `context7` | Programming library doc query | ❌ |
-| `tavily` | Web search | ✅ |
-| `filesystem` | Filesystem access | ❌ |
-| `brave-search` | Privacy search | ✅ |
-| `github` | GitHub operations | ✅ |
-| `sqlite` | Database query | ❌ |
-| `memory` | Key-value storage | ❌ |
+| `context7` | 编程库文档查询 | ❌ |
+| `tavily` | 网络搜索 | ✅ |
+| `filesystem` | 文件系统访问 | ❌ |
+| `brave-search` | 隐私搜索 | ✅ |
+| `github` | GitHub 操作 | ✅ |
+| `sqlite` | 数据库查询 | ❌ |
+| `memory` | 键值存储 | ❌ |
 
 ---
 
-## Verify Installation
+## 验证安装
 
-### Skill Verification
+### 技能验证
 
 ```bash
-# List installed skills
+# 列出已安装技能
 python bin/skill_manager.py list
 
-# Validate specific skill
+# 验证特定技能
 python bin/skill_manager.py validate .claude/skills/<name>
 
-# Search skill
+# 搜索技能
 python bin/skill_manager.py search prompt --score
 ```
 
-### MCP Verification
+### MCP 验证
 
 ```bash
-# List servers
+# 列出服务器
 python bin/mcp_manager.py list
 
-# Test connection
+# 测试连接
 python bin/mcp_manager.py test context7
 ```
 
 ---
 
-## Common Issues
+## 常见问题
 
-**Q: Skill not working?**
+**Q: 技能不生效？**
 ```bash
-# Check if SKILL.md exists
+# 检查 SKILL.md 是否存在
 cat .claude/skills/<name>/SKILL.md
 
-# Check frontmatter format
+# 检查 frontmatter 格式
 head -10 .claude/skills/<name>/SKILL.md
 ```
 
-**Q: How to install skill from GitHub?**
+**Q: 如何从 GitHub 安装技能？**
 ```bash
-# GitHub source needs to be cloned first
+# GitHub 源需要先克隆
 python bin/clone_manager.py clone https://github.com/user/repo
-# Then install from local cache
+# 然后从本地缓存安装
 python bin/skill_manager.py install mybox/cache/repos/user-repo/skill-name
 ```
 
-**Q: MCP server startup failed?**
+**Q: MCP 服务器启动失败？**
 ```bash
-# Check if command is available
+# 检查命令是否可用
 where npx
 
-# Test connection
+# 测试连接
 python bin/mcp_manager.py test <server-name>
 ```
 
 ---
 
-## Directory Structure
+## 目录结构
 
 ```
 myagent/
 ├── .claude/
-│   ├── skills/              # Installed skills
+│   ├── skills/              # 已安装技能
 │   │   └── <skill-name>/
 │   │       └── SKILL.md
-│   └── settings.local.json  # MCP permission config
-├── .mcp.json                 # MCP server config
+│   └── settings.local.json  # MCP 权限配置
+├── .mcp.json                 # MCP 服务器配置
 ├── bin/
-│   ├── skill_manager.py     # Skill management
-│   ├── mcp_manager.py       # MCP management
-│   └── clone_manager.py     # Git clone
+│   ├── skill_manager.py     # 技能管理
+│   ├── mcp_manager.py       # MCP 管理
+│   └── clone_manager.py     # Git 克隆
 ├── mybox/
-│   ├── workspace/           # Working files
-│   ├── cache/repos/         # Git cache
-│   └── backups/mcp/         # MCP backups
+│   ├── workspace/           # 工作文件
+│   ├── cache/repos/         # Git 缓存
+│   └── backups/mcp/         # MCP 备份
 └── docs/
-    ├── guides/              # Detailed guides
-    ├── commands.md          # Command registry
-    └── filesystem.md        # Filesystem description
+    ├── guides/              # 详细指南
+    ├── commands.md          # 命令注册表
+    └── filesystem.md        # 文件系统说明
 ```
 
 ---
 
-## Related Documentation
+## 相关文档
 
-### Detailed Guides
-- [Skill Manager Guide](./guides/skill-manager-guide.md) - Skill install, search, uninstall
-- [MCP Manager Guide](./guides/mcp-manager-guide.md) - MCP server management
+### 详细指南
+- [Skill Manager 使用指南](./guides/skill-manager-guide.md) - 技能安装、搜索、卸载
+- [MCP Manager 使用指南](./guides/mcp-manager-guide.md) - MCP 服务器管理
 
-### Reference Documents
-- [commands.md](./commands.md) - Complete command registry
-- [filesystem.md](./filesystem.md) - Filesystem layout
-- [CLAUDE.md](../CLAUDE.md) - Kernel logic core
+### 参考文档
+- [commands.md](./commands.md) - 完整命令注册表
+- [filesystem.md](./filesystem.md) - 文件系统布局
+- [CLAUDE.md](../CLAUDE.md) - 内核逻辑核心

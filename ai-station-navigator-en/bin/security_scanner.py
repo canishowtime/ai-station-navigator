@@ -1,14 +1,15 @@
+# -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 security_scanner.py - Agent Skills Security Scanner
-Wraps cisco-ai-skill-scanner, integrated into project path system
+封装 cisco-ai-skill-scanner，集成到项目路径体系
 
-Responsibilities:
-1. Phase 1 Security Scan (StaticAnalyzer + BehavioralAnalyzer)
-2. Batch Scan (with concurrency support)
-3. Configuration Management
+职责:
+1. 一期安全扫描（StaticAnalyzer + BehavioralAnalyzer）
+2. 批量扫描（并发支持）
+3. 配置管理
 
-Note: Clone functionality moved to clone_manager.py
+注意: 克隆功能已移至 clone_manager.py
 
 Based on cisco-ai-skill-scanner (Apache 2.0)
 https://github.com/cisco-ai-defense/skill-scanner
@@ -37,14 +38,14 @@ import gc
 import time
 
 # =============================================================================
-# Patch Application Status Flag (lazy loading)
+# 补丁应用状态标志（懒加载）
 # =============================================================================
 
 _patches_applied = False
 
 
 def _ensure_patches_applied() -> None:
-    """Ensure patches are applied (lazy load, only on first use)"""
+    """确保补丁已应用（懒加载，仅在首次需要时执行）"""
     global _patches_applied
     if not _patches_applied:
         _patch_skill_loader()
@@ -52,20 +53,20 @@ def _ensure_patches_applied() -> None:
 
 
 # =============================================================================
-# Frontmatter Forgiving Parse Patch (Plan A)
+# Frontmatter 容错解析补丁 (方案 A)
 # =============================================================================
 
 def _patch_skill_loader() -> bool:
     """
-    Fix skill_scanner frontmatter parsing issues
+    修复 skill_scanner 的 frontmatter 解析问题
 
-    Issue: YAML format errors (e.g., key:value) cause entire scan to fail
-    Solution: Forgiving parse, fallback to continue code scan on failure
+    问题：YAML 格式错误（如 key:value）导致整个扫描失败
+    解决：容错解析，失败时使用降级方案继续扫描代码
 
-    Note: This is Monkey Patching. If cisco-ai-skill-scanner updates internal implementation,
-    patch may become ineffective. Recommend checking patch compatibility periodically.
+    注意：这是 Monkey Patching，如果 cisco-ai-skill-scanner 更新内部实现，
+    补丁可能会失效。建议定期检查补丁兼容性。
 
-    Long-term: Submit PR upstream to improve frontmatter fault tolerance.
+    长期方案：向上游提交 PR 改进 frontmatter 容错性。
     """
     try:
         import re
@@ -75,44 +76,44 @@ def _patch_skill_loader() -> bool:
         original_parse_skill_md = SkillLoader._parse_skill_md
 
         def _parse_frontmatter_forgiving(content: str):
-            """Forgiving frontmatter parsing"""
+            """容错解析 frontmatter"""
             try:
                 import frontmatter
                 post = frontmatter.loads(content)
                 return post.metadata, post.content, None
             except Exception as e:
-                # frontmatter parse failed, manual split
+                # frontmatter 解析失败，手动分离
                 metadata, body = _split_frontmatter_raw(content)
                 return metadata, body, str(e)
 
         def _split_frontmatter_raw(content: str):
-            """Manual frontmatter and body split (forgiving)"""
+            """手动分离 frontmatter 和 body（容错）"""
             if not content.startswith("---"):
                 return {}, content
 
-            # Find second ---
+            # 找到第二个 ---
             parts = content.split("---", 2)
             if len(parts) < 3:
                 return {}, content
 
-            # Try lenient YAML parsing
+            # 尝试宽松解析 YAML
             frontmatter_text = parts[1]
             body = parts[2].lstrip()
 
-            # Use regex for fault-tolerant extraction (handle key:value format)
+            # 使用正则容错提取（处理 key:value 格式）
             metadata = {}
             for line in frontmatter_text.strip().split('\n'):
                 line = line.strip()
                 if not line or line.startswith('#'):
                     continue
 
-                # Forgiving match: key: value or key:value
+                # 容错匹配：key: value 或 key:value
                 match = re.match(r'^([\w-]+):\s*(.+)$', line)
                 if match:
                     key, value = match.groups()
                     metadata[key] = value
                 else:
-                    # Handle key:value format (no space)
+                    # 处理 key:value 格式（无空格）
                     match = re.match(r'^([\w-]+):(.+)$', line)
                     if match:
                         key, value = match.groups()
@@ -121,13 +122,13 @@ def _patch_skill_loader() -> bool:
             return metadata, body
 
         def _extract_fallback_metadata(skill_md_path, content, partial_metadata):
-            """Extract metadata from filename and content"""
+            """从文件名和内容推断元数据"""
             metadata = {}
 
-            # Extract name from path
+            # 从路径提取 name
             metadata["name"] = skill_md_path.parent.name
 
-            # Extract description from first paragraph
+            # 从首段提取 description
             body_lines = content.split('\n')
             for line in body_lines:
                 line = line.strip()
@@ -138,17 +139,17 @@ def _patch_skill_loader() -> bool:
             if "description" not in metadata:
                 metadata["description"] = "No description available"
 
-            # Merge partially parsed metadata
+            # 合并部分解析的元数据
             metadata.update(partial_metadata)
 
             return metadata
 
         def patched_parse_skill_md(self, skill_md_path, *, lenient: bool = False):
-            """Forgiving SKILL.md parsing
+            """容错解析 SKILL.md
 
             Args:
-                skill_md_path: SKILL.md file path
-                lenient: Lenient mode flag (added in 2.0, ignored in patch)
+                skill_md_path: SKILL.md 文件路径
+                lenient: 宽松模式标志（2.0 新增，补丁中忽略）
             """
             try:
                 with open(skill_md_path, encoding="utf-8") as f:
@@ -157,25 +158,25 @@ def _patch_skill_loader() -> bool:
                 from skill_scanner.core.loader import SkillLoadError
                 raise SkillLoadError(f"Failed to read SKILL.md: {e}")
 
-            # Forgiving frontmatter parsing
+            # 容错解析 frontmatter
             metadata, body, parse_error = _parse_frontmatter_forgiving(content)
 
-            # If parse failed, use fallback
+            # 如果解析失败，使用降级方案
             if parse_error:
                 metadata = _extract_fallback_metadata(skill_md_path, content, metadata)
-                # Mark parse error (but don't interrupt scan)
+                # 标记解析错误（但不中断扫描）
                 metadata["_parse_error"] = parse_error
 
-            # Validate required fields (use defaults)
+            # 验证必需字段（使用默认值）
             from skill_scanner.core.models import SkillManifest
 
             name = metadata.get("name") or skill_md_path.parent.name
             description = metadata.get("description") or "No description available"
 
-            # Clean internal markers
+            # 清理内部标记
             metadata.pop("_parse_error", None)
 
-            # Extract metadata field
+            # 提取 metadata 字段
             metadata_field = None
             if "metadata" in metadata and isinstance(metadata["metadata"], dict):
                 metadata_field = metadata["metadata"]
@@ -189,12 +190,12 @@ def _patch_skill_loader() -> bool:
                 if not metadata_field:
                     metadata_field = None
 
-            # Extract disable-model-invocation
+            # 提取 disable-model-invocation
             disable_model_invocation = metadata.get("disable-model-invocation")
             if disable_model_invocation is None:
                 disable_model_invocation = metadata.get("disable_model_invocation", False)
 
-            # Create manifest
+            # 创建 manifest
             manifest = SkillManifest(
                 name=name,
                 description=description,
@@ -207,19 +208,19 @@ def _patch_skill_loader() -> bool:
 
             return manifest, body
 
-        # Apply monkey patch
+        # 应用 monkey patch
         SkillLoader._parse_skill_md = patched_parse_skill_md
         return True
 
     except Exception as e:
-        # Patch failure doesn't affect scanner operation
+        # 补丁失败不影响扫描器运行
         import warnings
         warnings.warn(f"Failed to patch skill_loader: {e}")
         return False
 
 
 # =============================================================================
-# Path Configuration
+# 路径配置
 # =============================================================================
 
 BASE_DIR = Path(__file__).parent.parent
@@ -228,18 +229,18 @@ CACHE_DIR = BASE_DIR / "mybox" / "cache" / "repos"
 TEMP_DIR = BASE_DIR / "mybox" / "temp"
 CONFIG_FILE = BASE_DIR / ".claude" / "config" / "security.yml"
 
-# Add bin directory to sys.path
+# 添加 bin 目录到 sys.path
 _bin_dir = Path(__file__).parent
 if str(_bin_dir) not in sys.path:
     sys.path.insert(0, str(_bin_dir))
 
 
 # =============================================================================
-# Logging Utilities
+# 日志工具
 # =============================================================================
 
 def log(level: str, message: str, emoji: str = ""):
-    """Unified log output"""
+    """统一的日志输出"""
     from datetime import datetime
     timestamp = datetime.now().strftime("%H:%M:%S")
     print(f"{timestamp} [{level}] {emoji} {message}")
@@ -262,20 +263,20 @@ def error(msg: str):
 # =============================================================================
 
 def scan(skill_path: Path, config: Optional[Dict] = None) -> Dict[str, Any]:
-    """Scan skill or directory at specified path
+    """扫描指定路径的技能或目录
 
-    Uses StaticAnalyzer + BehavioralAnalyzer combination (default mode)
-    - No network requests required
-    - No API Key required
-    - Detection coverage ~95%
-    - Supports scanning normal directories without SKILL.md
+    使用 StaticAnalyzer + BehavioralAnalyzer 组合（默认模式）
+    - 无需网络请求
+    - 无需 API Key
+    - 检测覆盖率 ~95%
+    - 支持无 SKILL.md 的普通目录扫描
 
     Args:
-        skill_path: Skill directory path or any code directory
-        config: Optional config dict (loads default if not provided)
+        skill_path: 技能目录路径或任意代码目录
+        config: 可选配置字典（如不提供则加载默认配置）
 
     Returns:
-        Scan result dictionary
+        扫描结果字典
     """
     # 确保补丁已应用（懒加载）
     _ensure_patches_applied()
@@ -286,7 +287,7 @@ def scan(skill_path: Path, config: Optional[Dict] = None) -> Dict[str, Any]:
     except ImportError as e:
         return {
             "status": "error",
-            "error": f"cisco-ai-skill-scanner not installed: {e}",
+            "error": f"cisco-ai-skill-scanner 未安装: {e}",
             "severity": "UNKNOWN",
             "findings_count": 0,
             "threats": []
@@ -310,7 +311,7 @@ def scan(skill_path: Path, config: Optional[Dict] = None) -> Dict[str, Any]:
     if not analyzers:
         return {
             "status": "error",
-            "error": "No scan engines enabled",
+            "error": "未启用任何扫描引擎",
             "severity": "UNKNOWN",
             "findings_count": 0,
             "threats": []
@@ -345,9 +346,9 @@ def scan(skill_path: Path, config: Optional[Dict] = None) -> Dict[str, Any]:
                     warn(f"分析器 {analyzer.get_name()} 执行失败: {e}")
             scan_duration = time.time() - start_time
 
-        # Extract threat information (including context)
+        # 提取威胁信息（包含上下文）
         def extract_context(file_path: Path, line_number: int, window: int = 3) -> List[str]:
-            """Extract context of threat code"""
+            """提取威胁代码的上下文"""
             try:
                 if not file_path.exists():
                     return [f"[File not found: {file_path}]"]
@@ -409,13 +410,13 @@ def scan(skill_path: Path, config: Optional[Dict] = None) -> Dict[str, Any]:
 def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None,
                timeout: int = 60, show_progress: bool = True) -> Dict[str, Dict]:
     """
-    Batch scan skills (supports concurrency, timeout, and progress feedback)
+    批量扫描技能（支持并发、超时和进度反馈）
 
     Args:
-        skill_dirs: List of skill directories
-        config: Optional configuration
-        timeout: Per-skill timeout (seconds), default 5 minutes
-        show_progress: Whether to show progress info
+        skill_dirs: 技能目录列表
+        config: 可选配置
+        timeout: 单个技能超时时间（秒），默认 5 分钟
+        show_progress: 是否显示进度信息
 
     Returns:
         {skill_name: scan_result, ...}
@@ -428,10 +429,10 @@ def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None,
 
     scan_results = {}
 
-    # Single skill: direct scan
+    # 单个技能：直接扫描
     if len(skill_dirs) == 1:
         skill_dir = skill_dirs[0]
-        info(f"[SCAN] Security scan: {skill_dir.name}")
+        info(f"[SCAN] 安全扫描: {skill_dir.name}")
         try:
             scan_results[skill_dir.name] = scan(skill_dir, config)
         except Exception as e:
@@ -444,8 +445,8 @@ def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None,
             }
         return scan_results
 
-    # Batch skills: thread pool parallel scan
-    info(f"[SCAN] Batch parallel scan {len(skill_dirs)} skills (4 threads)...")
+    # 批量技能：线程池并行扫描
+    info(f"[SCAN] 批量并行扫描 {len(skill_dirs)} 个技能 (4线程)...")
 
     batch_size = 8
     total_batches = (len(skill_dirs) + batch_size - 1) // batch_size
@@ -460,8 +461,8 @@ def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None,
             elapsed = time.time() - start_time
             avg_time = elapsed / completed_count if completed_count > 0 else 0
             remaining = avg_time * (len(skill_dirs) - completed_count) if avg_time > 0 else 0
-            info(f"  Batch {batch_num}/{total_batches} ({completed_count}/{len(skill_dirs)} completed, "
-                 f"elapsed: {elapsed:.1f}s, estimated remaining: {remaining:.1f}s)")
+            info(f"  批次 {batch_num}/{total_batches} ({completed_count}/{len(skill_dirs)} 完成, "
+                 f"已用时: {elapsed:.1f}s, 预估剩余: {remaining:.1f}s)")
 
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = {
@@ -478,11 +479,11 @@ def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None,
                         completed_count += 1
                         status_icon = "[OK]" if result["status"] == "success" else "[!]"
                         print(f"    {completed_count}/{len(skill_dirs)} {skill_dir.name} {status_icon} "
-                              f"{result['severity']} ({result['findings_count']} threats)")
+                              f"{result['severity']} ({result['findings_count']} 威胁)")
                 except TimeoutError:
                     scan_results[skill_dir.name] = {
                         "status": "error",
-                        "error": f"Scan timeout (>{timeout}s)",
+                        "error": f"扫描超时 (>{timeout}s)",
                         "severity": "UNKNOWN",
                         "findings_count": 0,
                         "threats": []
@@ -502,20 +503,20 @@ def batch_scan(skill_dirs: List[Path], config: Optional[Dict] = None,
                         completed_count += 1
                         print(f"    {completed_count}/{len(skill_dirs)} {skill_dir.name} [ERROR] {str(e)[:50]}")
 
-        # Force garbage collection
+        # 强制垃圾回收
         gc.collect()
 
     return scan_results
 
 
 def is_safe(result: Dict[str, Any], allowed_severity: List[str]) -> bool:
-    """Check if scan result is within allowed severity levels"""
+    """判断扫描结果是否在允许的安全级别内"""
     severity = result.get("severity", "UNKNOWN")
     return severity in allowed_severity
 
 
 def load_config() -> Dict[str, Any]:
-    """Load security configuration"""
+    """加载安全配置"""
     if CONFIG_FILE.exists():
         import yaml
         try:
@@ -523,7 +524,7 @@ def load_config() -> Dict[str, Any]:
         except Exception:
             pass
 
-    # Default configuration
+    # 默认配置
     return {
         "scan_enabled": True,
         "scan_on_install": True,
@@ -543,7 +544,7 @@ def load_config() -> Dict[str, Any]:
 # =============================================================================
 
 def main():
-    """CLI entry point"""
+    """CLI 入口"""
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -551,31 +552,31 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Scan new skills in cache directory (based on clone script output)
+  # 扫描缓存目录中的新技能（根据克隆脚本输出）
   python bin/security_scanner.py scan-cache
 
-  # Scan specified path (cache directory only)
+  # 扫描指定路径（仅允许缓存目录）
   python bin/security_scanner.py scan <cache_path>
 
-  # View current configuration
+  # 查看当前配置
   python bin/security_scanner.py config
 
-SECURITY: Scan limited to mybox/cache/repos/ directory, scanning installed skills prohibited.
+SECURITY: 扫描仅限 mybox/cache/repos/ 目录，禁止扫描已安装技能。
         """
     )
 
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    subparsers = parser.add_subparsers(dest="command", help="可用命令")
 
-    # scan command (cache directory only)
-    scan_parser = subparsers.add_parser("scan", help="Scan specified path (cache directory only)")
-    scan_parser.add_argument("target", help="Skill path (must be under mybox/cache/repos/)")
-    scan_parser.add_argument("--json", action="store_true", help="Output JSON format (for script parsing)")
+    # scan 命令（仅允许缓存目录）
+    scan_parser = subparsers.add_parser("scan", help="扫描指定路径（仅限缓存目录）")
+    scan_parser.add_argument("targets", nargs='+', help="技能路径（支持多路径，必须是 mybox/cache/repos/ 下的路径）")
+    scan_parser.add_argument("--json", action="store_true", help="输出 JSON 格式（供脚本解析）")
 
-    # scan-cache command (scan new skills from clone script output)
-    subparsers.add_parser("scan-cache", help="Scan new skills in cache directory (based on clone script output)")
+    # scan-cache 命令（扫描克隆脚本输出的新技能）
+    subparsers.add_parser("scan-cache", help="扫描缓存目录中的新技能（根据克隆脚本输出）")
 
-    # config command
-    subparsers.add_parser("config", help="View current configuration")
+    # config 命令
+    subparsers.add_parser("config", help="查看当前配置")
 
     args = parser.parse_args()
 
@@ -583,74 +584,122 @@ SECURITY: Scan limited to mybox/cache/repos/ directory, scanning installed skill
         parser.print_help()
         return 1
 
-    # Load configuration
+    # 加载配置
     config = load_config()
 
     if args.command == "config":
-        print("Current security configuration:")
+        print("当前安全配置:")
         print(json.dumps(config, ensure_ascii=False, indent=2))
         return 0
 
     elif args.command == "scan":
-        target = args.target
-        skill_path = None
+        targets = args.targets
+        skill_paths = []
 
-        if Path(target).is_absolute():
-            # Absolute path: use directly
-            skill_path = Path(target)
-        else:
-            # Relative path: resolve from BASE_DIR
-            skill_path = BASE_DIR / target
+        # 解析所有目标路径
+        for target in targets:
+            if Path(target).is_absolute():
+                skill_paths.append(Path(target))
+            else:
+                skill_paths.append(BASE_DIR / target)
 
-        # Path security verification: must be under cache directory
-        try:
-            skill_path.resolve().relative_to(CACHE_DIR.resolve())
-        except ValueError:
-            print(f"Error: Security restriction - scan limited to cache directory (mybox/cache/repos/)")
-            print(f"Target path: {skill_path.resolve()}")
-            print(f"Allowed scope: {CACHE_DIR.resolve()}")
+        # 路径安全验证：所有路径必须位于缓存目录下
+        for skill_path in skill_paths:
+            try:
+                skill_path.resolve().relative_to(CACHE_DIR.resolve())
+            except ValueError:
+                print(f"错误: 安全限制 - 扫描仅限缓存目录 (mybox/cache/repos/)")
+                print(f"目标路径: {skill_path.resolve()}")
+                print(f"允许范围: {CACHE_DIR.resolve()}")
+                return 1
+
+        # 验证路径存在性
+        valid_paths = []
+        for skill_path in skill_paths:
+            if skill_path.exists():
+                valid_paths.append(skill_path)
+            else:
+                print(f"警告: 路径不存在，跳过: {skill_path.resolve()}")
+
+        if not valid_paths:
+            print("错误: 没有有效的扫描路径")
             return 1
 
-        if not skill_path.exists():
-            print(f"Error: Path does not exist: {skill_path.resolve()}")
+        # 收集所有技能目录（支持递归查找）
+        all_skill_dirs = []
+        for skill_path in valid_paths:
+            if (skill_path / "SKILL.md").exists():
+                # 单个技能目录
+                all_skill_dirs.append(skill_path)
+            else:
+                # 非技能目录：递归查找子目录中的技能
+                found = [d for d in skill_path.rglob("*")
+                         if d.is_dir() and (d / "SKILL.md").exists()]
+                if found:
+                    all_skill_dirs.extend(found)
+                else:
+                    print(f"警告: 未找到技能目录: {skill_path}")
+
+        if not all_skill_dirs:
+            print("错误: 未找到任何技能目录（包含 SKILL.md）")
             return 1
 
-        result = scan(skill_path, config)
+        # 去重（防止重复扫描）
+        all_skill_dirs = list(set(all_skill_dirs))
 
-        # JSON output mode (for script parsing)
-        if getattr(args, 'json', False):
+        # JSON 输出模式：仅支持单个技能
+        if getattr(args, 'json', False) and len(all_skill_dirs) == 1:
+            result = scan(all_skill_dirs[0], config)
             print(json.dumps(result, ensure_ascii=False, separators=(',', ':')))
             return 0 if result["status"] == "success" else 1
 
-        # Default: human-readable output
-        print(f"Scan: {skill_path}")
-        print(f"\nStatus: {result['status']}")
-        print(f"Severity: {result['severity']}")
-        print(f"Threats found: {result['findings_count']}")
+        # 批量扫描
+        print(f"扫描 {len(all_skill_dirs)} 个技能...\n")
+        scan_results = batch_scan(all_skill_dirs, config, timeout=60, show_progress=True)
 
-        if result.get("error"):
-            print(f"\nError message: {result['error']}")
+        # 汇总结果
+        all_safe = True
+        threatened_skills = []
 
-        if result.get("threats"):
-            print("\nThreat details:")
-            for threat in result["threats"]:
-                print(f"  - [{threat['severity']}] {threat['title']}")
-                if threat.get("file"):
-                    print(f"    File: {threat['file']}:{threat.get('line', '?')}")
+        for skill_dir, result in scan_results.items():
+            if result["status"] != "success":
+                all_safe = False
+                threatened_skills.append((skill_dir, result))
 
-        if result.get("details"):
-            print(f"\nScan duration: {result['details'].get('scan_duration', 0):.2f}s")
-            print(f"Analyzers: {', '.join(result['details'].get('analyzers_used', []))}")
+        print()
 
-        return 0 if result["status"] == "success" else 1
+        # 显示威胁详情
+        if threatened_skills:
+            print(f"发现 {len(threatened_skills)} 个威胁技能:")
+            for skill_name, result in threatened_skills:
+                status = result.get("status", "unknown")
+                severity = result.get("severity", "UNKNOWN")
+                count = result.get("findings_count", 0)
+                error = result.get("error", "")
 
-    elif args.command == "scan-cache":
-        # Scan new skills in cache directory (based on clone script output)
-        if not CACHE_DIR.exists():
-            print("Error: Cache directory does not exist")
+                if error:
+                    print(f"  [!] {skill_name}: {error}")
+                else:
+                    print(f"  [!] {skill_name}: {severity} ({count} 个威胁)")
+
+                    for threat in result.get("threats", [])[:3]:
+                        print(f"      - [{threat['severity']}] {threat['title']}")
+                    if len(result.get("threats", [])) > 3:
+                        print(f"      ... 还有 {len(result.get('threats', [])) - 3} 个")
+
+        if all_safe:
+            print("所有技能扫描通过")
+            return 0
+        else:
             return 1
 
-        # Prioritize reading .last_cloned_repo file (written by clone script)
+    elif args.command == "scan-cache":
+        # 扫描缓存目录中的新技能（根据克隆脚本输出）
+        if not CACHE_DIR.exists():
+            print("错误: 缓存目录不存在")
+            return 1
+
+        # 优先读取 .last_cloned_repo 文件（克隆脚本写入）
         last_cloned_file = TEMP_DIR / ".last_cloned_repo"
         scan_dirs = []
 
@@ -661,36 +710,36 @@ SECURITY: Scan limited to mybox/cache/repos/ directory, scanning installed skill
                 target_repo = CACHE_DIR / repo_name
                 if target_repo.exists() and target_repo.is_dir():
                     scan_dirs = [target_repo]
-                    info(f"[SCAN] Scanning latest cloned repo: {repo_name}")
+                    info(f"[SCAN] 扫描最新克隆仓库: {repo_name}")
                 else:
-                    warn(f"Repository specified by .last_cloned_repo does not exist: {repo_name}")
+                    warn(f".last_cloned_repo 指定的仓库不存在: {repo_name}")
                     scan_dirs = [d for d in CACHE_DIR.iterdir() if d.is_dir() and d.name != ".gitkeep"]
             except Exception as e:
-                warn(f"Failed to read .last_cloned_repo: {e}")
+                warn(f"读取 .last_cloned_repo 失败: {e}")
                 scan_dirs = [d for d in CACHE_DIR.iterdir() if d.is_dir() and d.name != ".gitkeep"]
         else:
-            # File not found: scan all (backward compatibility)
-            info("[SCAN] .last_cloned_repo marker not found, scanning all cache directories")
+            # 文件不存在：扫描全部（向后兼容）
+            info("[SCAN] 未找到 .last_cloned_repo 标记，扫描全部缓存目录")
             scan_dirs = [d for d in CACHE_DIR.iterdir() if d.is_dir() and d.name != ".gitkeep"]
 
-        # Find skill subdirectories
+        # 查找技能子目录
         cache_skills = []
         for repo_dir in scan_dirs:
-            # Find skill directories under repo (containing SKILL.md)
+            # 查找 repo 下的技能目录（包含 SKILL.md 的目录）
             for skill_dir in repo_dir.rglob("*"):
                 if skill_dir.is_dir() and (skill_dir / "SKILL.md").exists():
                     cache_skills.append(skill_dir)
 
         if not cache_skills:
-            print("No skills found in cache directory")
+            print("缓存目录中没有发现技能")
             return 0
 
-        print(f"Scanning {len(cache_skills)} skills in cache directory...\n")
+        print(f"扫描缓存目录中的 {len(cache_skills)} 个技能...\n")
 
-        # Use batch concurrent scan
+        # 使用批量并发扫描
         scan_results = batch_scan(cache_skills, config, timeout=60, show_progress=True)
 
-        # Summarize results
+        # 汇总结果
         all_safe = True
         threatened_skills = []
 
@@ -704,9 +753,9 @@ SECURITY: Scan limited to mybox/cache/repos/ directory, scanning installed skill
 
         print()
 
-        # Display threat details
+        # 显示威胁详情
         if threatened_skills:
-            print(f"Found {len(threatened_skills)} threatened skills:")
+            print(f"发现 {len(threatened_skills)} 个威胁技能:")
             for skill_name, result in threatened_skills:
                 status = result.get("status", "unknown")
                 severity = result.get("severity", "UNKNOWN")
@@ -716,16 +765,16 @@ SECURITY: Scan limited to mybox/cache/repos/ directory, scanning installed skill
                 if error:
                     print(f"  [!] {skill_name}: {error}")
                 else:
-                    print(f"  [!] {skill_name}: {severity} ({count} threats)")
+                    print(f"  [!] {skill_name}: {severity} ({count} 个威胁)")
 
-                    # Display threat list
+                    # 显示威胁列表
                     for threat in result.get("threats", [])[:3]:
                         print(f"      - [{threat['severity']}] {threat['title']}")
                     if len(result.get("threats", [])) > 3:
-                        print(f"      ... and {len(result.get('threats', [])) - 3} more")
+                        print(f"      ... 还有 {len(result.get('threats', [])) - 3} 个")
 
         if all_safe:
-            print("All skills passed scan")
+            print("所有技能扫描通过")
             return 0
         else:
             return 1

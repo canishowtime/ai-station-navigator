@@ -1,6 +1,6 @@
 ---
 name: skills_agent
-description: 技能执行沙箱。负责已安装技能的路径解析、指令构建与隔离运行。触发：@技能名 / 运行技能。
+description: "Skill execution sandbox. Responsible for path resolution, command construction, and isolated execution of installed skills. Triggered by: @skill-name / run skill."
 color: orange
 allowed-tools: [Skill]
 restricted-tools: [Read]

@@ -24,10 +24,6 @@ yara-python>=4.5.0
 # Markdown Frontmatter 解析 (security_scanner.py 依赖)
 python-frontmatter>=1.0.0
 
-# LangGraph 工作流引擎 (skill_install_workflow.py)
-langgraph>=0.2.0
-typing-extensions>=4.9.0
-
 # =============================================================================
 # 可选依赖
 # =============================================================================

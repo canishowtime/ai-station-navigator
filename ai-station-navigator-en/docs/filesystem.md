@@ -1,31 +1,31 @@
-# Filesystem Architecture
+# Filesystem Architecture (文件系统架构)
 
 **Context**: Level 2 Architecture
 **Parent**: `CLAUDE.md`
-**Rule**: All I/O operations must strictly follow these permission bits (Permission Bits).
+**Rule**: 所有 I/O 操作严格遵循以下权限位 (Permission Bits)。
 
-## 0. Project Root Detection
+## 0. 项目根目录识别 (Project Root Detection)
 
-### Marker Files
-Project root directory should contain the following files:
-- `CLAUDE.md` (required)
-- `docs/` (required)
-- `bin/` (required)
-- `.claude/` (required)
+### 标志文件
+项目根目录应包含以下文件：
+- `CLAUDE.md` (必需)
+- `docs/` (必需)
+- `bin/` (必需)
+- `.claude/` (必需)
 
-### Detection Commands
+### 检测命令
 ```bash
-# Check if current directory is project root
+# 检测当前目录是否为项目根目录
 test -f CLAUDE.md && echo "ROOT" || echo "NOT_ROOT"
 
-# Search upward for project root
-# Start from current directory, search upward for directory containing CLAUDE.md
+# 向上查找项目根目录
+# 从当前目录开始，向上查找包含 CLAUDE.md 的目录
 ```
 
-### Directory Structure Description
+### 目录结构说明
 ```
-<any-parent-directory>/              ← Launch location
-└── myagent/ai-station-navigator/    ← Project root (CLAUDE.md here)
+<任意父目录>/                     ← 启动位置
+└── myagent/ai-station-navigator/  ← 项目根目录 (CLAUDE.md 在此)
     ├── CLAUDE.md
     ├── docs/
     ├── bin/
@@ -35,104 +35,104 @@ test -f CLAUDE.md && echo "ROOT" || echo "NOT_ROOT"
 
 ---
 
-## 1. Topology & Permissions
+## 1. 拓扑与权限 (Topology & Permissions)
 
 ```text
 project-root/
-├── bin/                     🔒 [RO]  Core Logic (modifications/writing prohibited)
-├── .claude/                 🟡 [Sys] System Config (manager operations only)
+├── bin/                     🔒 [RO]  Core Logic (严禁修改/写入)
+├── .claude/                 🟡 [Sys] System Config (仅限 manager 操作)
 │   ├── agents/              📋 Agent Definitions
 │   ├── memory/              💾 User Preferences
 │   ├── skills/              ⚙️  Active Skills
 │   └── state/               🔄 Runtime State
-├── mybox/                   ⚡ [RW]  Sandbox (only free R/W area)
-│   ├── workspace/           ↻  [Work] Workspace (task files)
-│   ├── temp/                ✕  [Tmp] Temporary cache (auto cleanup)
-│   ├── cache/               💾 Persistent cache
-│   │   └── repos/           📦 Git repository cache
-│   └── logs/                📝 Runtime logs
+├── mybox/                   ⚡ [RW]  Sandbox (唯一自由读写区)
+│   ├── workspace/           ↻  [Work] 工作区 (任务文件)
+│   ├── temp/                ✕  [Tmp] 临时缓存 (自动清理)
+│   ├── cache/               💾 持久化缓存
+│   │   └── repos/           📦 Git 仓库缓存
+│   └── logs/                📝 运行日志
 ├── docs/                    📖 [RO]  Documentation
-│   ├── commands.md          📋 Command registry
-│   ├── filesystem.md        📁 Filesystem specification
-│   ├── skills-quickstart.md ⚡ Skills quickstart
-│   ├── skills-mapping.md    🗺️ Sub-skill mapping table
-│   ├── subagent-Protocol.md 📡 Sub-agent communication protocol
-│   ├── guides/              📚 Operation guides
-│   │   ├── README.md                        Overview index
-│   │   ├── skill-install-workflow-guide.md  Skill installation workflow
-│   │   ├── clone-manager-guide.md           Repository clone management
-│   │   ├── security-scanner-guide.md        Security scanner
-│   │   ├── skill-manager-guide.md           Skill management
-│   │   ├── mcp-manager-guide.md             MCP management
-│   │   ├── file-editor-guide.md             File editor
-│   │   ├── gh-fetch-guide.md                GitHub resource fetching
-│   │   └── hooks-manager-guide.md           Hooks management
+│   ├── commands.md          📋 命令注册表
+│   ├── filesystem.md        📁 文件系统规范
+│   ├── skills-quickstart.md ⚡ 技能快速入门
+│   ├── skills-mapping.md    🗺️ 子技能映射表
+│   ├── subagent-Protocol.md 📡 子智能体通信协议
+│   ├── guides/              📚 操作指南
+│   │   ├── README.md                        总览索引
+│   │   ├── skill-install-workflow-guide.md  技能安装工作流
+│   │   ├── clone-manager-guide.md           仓库克隆管理
+│   │   ├── security-scanner-guide.md        安全扫描器
+│   │   ├── skill-manager-guide.md           技能管理
+│   │   ├── mcp-manager-guide.md             MCP 管理
+│   │   ├── file-editor-guide.md             文件编辑器
+│   │   ├── gh-fetch-guide.md                GitHub 资源获取
+│   │   └── hooks-manager-guide.md           钩子管理
 ├── tests/                   🧪 [RO]  Test Suite
-├── mazilin_workflows/       🔄 [RW]  Official workflow storage
-│   ├── README.md            📋 Workflow overview
-│   └── *.md                 📄 Individual workflow documents
+├── mazilin_workflows/       🔄 [RW]  官方工作流应用存储
+│   ├── README.md            📋 工作流总览
+│   └── *.md                 📄 各工作流文档
 ├── CLAUDE.md                📜 Core Protocol
 └── README.md                📄 Project Info
 ```
 
-## 1.1 mybox Path Specification
+## 1.1 mybox 路径规范 (Path Specification)
 
-**Directory Purpose Definition**:
+**目录用途定义**:
 
-| Path | Purpose | Volatility | Cleanup Timing |
+| 路径 | 用途 | 易失性 | 清理时机 |
 |:---|:---|:---|:---|
-| `workspace/` | Work files (organized by task name) | Medium | After task completion |
-| `temp/` | Temporary files (downloads/intermediate) | High | Auto/periodic cleanup |
-| `cache/repos/` | Git repository cache | Low | Manual cleanup |
-| `logs/` | Runtime logs | Low | Auto rotation |
+| `workspace/` | 工作文件 (按任务名组织) | 中 | 任务完成后 |
+| `temp/` | 临时文件 (下载/中间产物) | 高 | 自动/定期清理 |
+| `cache/repos/` | Git 仓库缓存 | 低 | 手动清理 |
+| `logs/` | 运行日志 | 低 | 自动轮转 |
 
-**Path Selection Rules**:
+**路径选择规则**:
 ```
-Write requirement → File type?
-    ├─ Temporary/download → mybox/temp/
-    ├─ Persistent cache → mybox/cache/
-    ├─ Work files → mybox/workspace/<task-name>/
-    ├─ Workflow docs → mazilin_workflows/<workflow-name>.md
-    └─ Logs → mybox/logs/
+写入需求 → 文件类型？
+    ├─ 临时/下载 → mybox/temp/
+    ├─ 持久化缓存 → mybox/cache/
+    ├─ 工作文件 → mybox/workspace/<task-name>/
+    ├─ 工作流文档 → mazilin_workflows/<workflow-name>.md
+    └─ 日志 → mybox/logs/
 ```
 
-## 2. Data Pipelines
+## 2. 数据管道 (Data Pipelines)
 
-### A. Skill Deployment Pipeline
+### A. 技能部署流 (Install Pipeline)
 `External Source` -> `mybox/temp/` (Download) -> **Validate** -> `.claude/skills/` (Deploy)
 
-### B. Task Execution Pipeline
-1. **Ingest**: External files -> `mybox/temp/`
-2. **Process**: Work files -> `mybox/workspace/<task>/`
-3. **GC**: Task end -> Clean up `mybox/temp/` and `mybox/workspace/<task>/`
+### B. 任务执行流 (Task Pipeline)
+1. **Ingest**: 外部文件 -> `mybox/temp/`
+2. **Process**: 工作文件 -> `mybox/workspace/<task>/`
+3. **GC**: 任务结束 -> 清理 `mybox/temp/` 和 `mybox/workspace/<task>/`
 
-## 3. Core Constraints
+## 3. 核心约束 (Core Constraints)
 
-1.  **Default Sandboxing**:
-    - If user does not specify path, write operations **must** point to `mybox/workspace/`.
-    - Prohibit creating files in `project-root/` root directory.
+1.  **沙盒默认 (Default Sandboxing)**:
+    - 若用户未指定路径，写操作**必须**指向 `mybox/workspace/`。
+    - 禁止在 `project-root/` 根目录创建文件。
 
-2.  **Volatility**:
-    - `mybox/` is considered **volatile storage** (can be cleaned up at any time).
-    - Configuration requiring persistence should be stored in `.claude/`.
+2.  **易失性 (Volatility)**:
+    - `mybox/` 视为**易失性存储** (可随时被清理)。
+    - 需要持久化的配置存入 `.claude/`。
 
-3.  **Task Isolation**:
-    - Each task uses independent subdirectory: `mybox/workspace/<task-name>/`
+3.  **任务隔离 (Task Isolation)**:
+    - 每个任务使用独立子目录：`mybox/workspace/<task-name>/`
 
-## 4. Cleanup Mechanism
+## 4. 清理机制 (Cleanup)
 
-| Trigger Condition | Cleanup Content |
+| 触发条件 | 清理内容 |
 |:---|:---|
-| Session start | log_rotate (rotate logs) |
-| Session start | cleanup_temp (clean temporary files) |
-| Task completion | cleanup_workspace (clean task directory) |
+| 会话开始 | log_rotate (轮转日志) |
+| 会话开始 | cleanup_temp (清理临时文件) |
+| 任务完成 | cleanup_workspace (清理任务目录) |
 
-### Manual Operations
+### 手动操作
 ```bash
-# Trigger all Hooks
+# 触发所有 Hooks
 python bin/hooks_manager.py execute --force
 
-# Clean specific directories
+# 清理特定目录
 rm -rf mybox/temp/*
 rm -rf mybox/workspace/<task-name>/
 ```

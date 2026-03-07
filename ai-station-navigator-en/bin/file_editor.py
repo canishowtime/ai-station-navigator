@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-File Editor - Previewless File Editing Tool
-Replaces Edit tool to avoid terminal flicker
+File Editor - 无预览文件编辑工具
+替代 Edit 工具避免终端闪烁
 """
 
 import sys
 import os
 
-# Windows UTF-8 Compatibility (P0 - All scripts must include)
+# Windows UTF-8 兼容 (P0 - 所有脚本必须包含)
 if sys.platform == 'win32':
     try:
         sys.stdout.reconfigure(encoding='utf-8')
@@ -23,60 +23,60 @@ import re
 from pathlib import Path
 from datetime import datetime
 
-# Add project lib directory to sys.path (green package bundled dependencies)
+# 添加项目 lib 目录到 sys.path（绿色包预置依赖）
 _lib_dir = Path(__file__).parent.parent / "lib"
 if _lib_dir.exists():
     sys.path.insert(0, str(_lib_dir))
 
 
 def read_file(file_path: str) -> str:
-    """Read file content"""
+    """读取文件内容"""
     try:
         return Path(file_path).read_text(encoding='utf-8')
     except FileNotFoundError:
-        print(f"[X] Error: File not found: {file_path}", file=sys.stderr)
+        print(f"❌ Error: File not found: {file_path}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"[X] Error reading file: {e}", file=sys.stderr)
+        print(f"❌ Error reading file: {e}", file=sys.stderr)
         sys.exit(1)
 
 
 def write_file(file_path: str, content: str) -> None:
-    """Write file content"""
+    """写入文件内容"""
     try:
         Path(file_path).write_text(content, encoding='utf-8')
     except Exception as e:
-        print(f"[X] Error writing file: {e}", file=sys.stderr)
+        print(f"❌ Error writing file: {e}", file=sys.stderr)
         sys.exit(1)
 
 
 def replace(file_path: str, old: str, new: str) -> None:
-    """Exact string replacement
+    """精确替换字符串
 
     Args:
-        file_path: File path
-        old: Old string to replace
-        new: New string
+        file_path: 文件路径
+        old: 要替换的旧字符串
+        new: 新字符串
     """
     content = read_file(file_path)
 
     if old not in content:
-        print(f"[!] Warning: '{old[:50]}...' not found in file")
+        print(f"⚠️ Warning: '{old[:50]}...' not found in file")
         return
 
     content = content.replace(old, new)
     write_file(file_path, content)
-    print(f"[OK] Replaced in {file_path}")
+    print(f"✅ Replaced in {file_path}")
 
 
 def regex_replace(file_path: str, pattern: str, replacement: str, count: int = 0) -> None:
-    """Regex replacement
+    """正则表达式替换
 
     Args:
-        file_path: File path
-        pattern: Regex pattern
-        replacement: Replacement string
-        count: Number of replacements (0=all)
+        file_path: 文件路径
+        pattern: 正则表达式模式
+        replacement: 替换字符串
+        count: 替换次数（0=全部）
     """
     content = read_file(file_path)
 
@@ -86,23 +86,23 @@ def regex_replace(file_path: str, pattern: str, replacement: str, count: int = 0
         else:
             content = re.sub(pattern, replacement, content)
     except re.error as e:
-        print(f"[X] Regex error: {e}", file=sys.stderr)
+        print(f"❌ Regex error: {e}", file=sys.stderr)
         sys.exit(1)
 
     write_file(file_path, content)
-    print(f"[OK] Regex replaced in {file_path}")
+    print(f"✅ Regex replaced in {file_path}")
 
 
 def append(file_path: str, content: str, newline: bool = True) -> None:
-    """Append content to end of file
+    """追加内容到文件末尾
 
     Args:
-        file_path: File path
-        content: Content to append
-        newline: Whether to add newline before content
+        file_path: 文件路径
+        content: 要追加的内容
+        newline: 是否在内容前添加换行符
     """
     try:
-        # Read existing content first to check newline
+        # 先读取现有内容检查换行
         if newline:
             try:
                 existing = read_file(file_path)
@@ -114,104 +114,104 @@ def append(file_path: str, content: str, newline: bool = True) -> None:
             if newline and needs_newline:
                 f.write('\n')
             f.write(content)
-        print(f"[OK] Appended to {file_path}")
+        print(f"✅ Appended to {file_path}")
     except Exception as e:
-        print(f"[X] Error appending to file: {e}", file=sys.stderr)
+        print(f"❌ Error appending to file: {e}", file=sys.stderr)
         sys.exit(1)
 
 
 def prepend(file_path: str, content: str) -> None:
-    """Insert content at beginning of file
+    """在文件开头插入内容
 
     Args:
-        file_path: File path
-        content: Content to insert
+        file_path: 文件路径
+        content: 要插入的内容
     """
     text = read_file(file_path)
     write_file(file_path, content + '\n' + text)
-    print(f"[OK] Prepended to {file_path}")
+    print(f"✅ Prepended to {file_path}")
 
 
 def insert_after(file_path: str, marker: str, content: str) -> None:
-    """Insert content after marker
+    """在标记后插入内容
 
     Args:
-        file_path: File path
-        marker: Locator marker string
-        content: Content to insert
+        file_path: 文件路径
+        marker: 定位标记字符串
+        content: 要插入的内容
     """
     text = read_file(file_path)
 
     if marker not in text:
-        print(f"[!] Warning: Marker '{marker[:50]}...' not found")
+        print(f"⚠️ Warning: Marker '{marker[:50]}...' not found")
         return
 
     text = text.replace(marker, marker + '\n' + content, 1)
     write_file(file_path, text)
-    print(f"[OK] Inserted after marker in {file_path}")
+    print(f"✅ Inserted after marker in {file_path}")
 
 
 def insert_before(file_path: str, marker: str, content: str) -> None:
-    """Insert content before marker
+    """在标记前插入内容
 
     Args:
-        file_path: File path
-        marker: Locator marker string
-        content: Content to insert
+        file_path: 文件路径
+        marker: 定位标记字符串
+        content: 要插入的内容
     """
     text = read_file(file_path)
 
     if marker not in text:
-        print(f"[!] Warning: Marker '{marker[:50]}...' not found")
+        print(f"⚠️ Warning: Marker '{marker[:50]}...' not found")
         return
 
     text = text.replace(marker, content + '\n' + marker, 1)
     write_file(file_path, text)
-    print(f"[OK] Inserted before marker in {file_path}")
+    print(f"✅ Inserted before marker in {file_path}")
 
 
 def delete_between(file_path: str, start_marker: str, end_marker: str) -> None:
-    """Delete content between two markers (including markers)
+    """删除两个标记之间的内容（包含标记）
 
     Args:
-        file_path: File path
-        start_marker: Start marker
-        end_marker: End marker
+        file_path: 文件路径
+        start_marker: 起始标记
+        end_marker: 结束标记
     """
     text = read_file(file_path)
 
     if start_marker not in text or end_marker not in text:
-        print(f"[!] Warning: Markers not found")
+        print(f"⚠️ Warning: Markers not found")
         return
 
     pattern = re.escape(start_marker) + r'.*?' + re.escape(end_marker)
     text = re.sub(pattern, '', text, flags=re.DOTALL)
     write_file(file_path, text)
-    print(f"[OK] Deleted between markers in {file_path}")
+    print(f"✅ Deleted between markers in {file_path}")
 
 
 def update_json_field(file_path: str, field_path: str, value: str) -> None:
-    """Update field in JSON file
+    """更新 JSON 文件中的字段
 
     Args:
-        file_path: JSON file path
-        field_path: Field path (e.g., "a.b.c")
-        value: New value (auto-detect type)
+        file_path: JSON 文件路径
+        field_path: 字段路径（如 "a.b.c"）
+        value: 新值（自动推断类型）
     """
     try:
         data = json.loads(read_file(file_path))
     except json.JSONDecodeError as e:
-        print(f"[X] Invalid JSON: {e}", file=sys.stderr)
+        print(f"❌ Invalid JSON: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Infer value type
+    # 推断值类型
     try:
         value = json.loads(value)
     except json.JSONDecodeError:
-        # Keep as string
+        # 保持为字符串
         pass
 
-    # Navigate to target field
+    # 导航到目标字段
     keys = field_path.split('.')
     target = data
     for key in keys[:-1]:
@@ -219,11 +219,11 @@ def update_json_field(file_path: str, field_path: str, value: str) -> None:
             target[key] = {}
         target = target[key]
 
-    # Update value
+    # 更新值
     target[keys[-1]] = value
 
     write_file(file_path, json.dumps(data, ensure_ascii=False, indent=2))
-    print(f"[OK] Updated JSON field '{field_path}' in {file_path}")
+    print(f"✅ Updated JSON field '{field_path}' in {file_path}")
 
 
 def main():
@@ -246,62 +246,62 @@ def main():
     }
 
     if operation not in operations:
-        print(f"[X] Unknown operation: {operation}", file=sys.stderr)
+        print(f"❌ Unknown operation: {operation}", file=sys.stderr)
         print_usage()
         sys.exit(1)
 
     min_args, func = operations[operation]
 
     if len(args) < min_args:
-        print(f"[X] Not enough arguments for '{operation}'", file=sys.stderr)
+        print(f"❌ Not enough arguments for '{operation}'", file=sys.stderr)
         print_usage()
         sys.exit(1)
 
     try:
         func(*args)
     except TypeError as e:
-        print(f"[X] Argument error: {e}", file=sys.stderr)
+        print(f"❌ Argument error: {e}", file=sys.stderr)
         print_usage()
         sys.exit(1)
 
 
 def print_usage():
-    """Print usage instructions"""
+    """打印使用说明"""
     usage = """
-File Editor - Previewless File Editing Tool
+File Editor - 无预览文件编辑工具
 
-Usage:
+用法:
   python bin/file_editor.py <operation> [arguments...]
 
-Operations:
+操作:
   replace <file> <old> <new>
-      Exact string replacement
+      精确替换字符串
 
   regex <file> <pattern> <replacement> [count=0]
-      Regex replacement (count=0 means replace all)
+      正则表达式替换（count=0 表示全部替换）
 
   append <file> <content>
-      Append content to end of file
+      追加内容到文件末尾
 
   prepend <file> <content>
-      Insert content at beginning of file
+      在文件开头插入内容
 
   insert-after <file> <marker> <content>
-      Insert content after marker
+      在标记后插入内容
 
   insert-before <file> <marker> <content>
-      Insert content before marker
+      在标记前插入内容
 
   delete-between <file> <start_marker> <end_marker>
-      Delete content between two markers
+      删除两个标记之间的内容
 
   update-json <file> <field_path> <value>
-      Update JSON field (field_path: "a.b.c")
+      更新 JSON 字段（field_path: "a.b.c"）
 
-Examples:
+示例:
   python bin/file_editor.py replace mybox/config.yaml "old" "new"
   python bin/file_editor.py append mybox/log.txt "New entry"
-  python bin/file_editor.py regex mybox/data.txt "\\d+" "X"
+  python bin/file_editor.py regex mybox/data.txt "\d+" "X"
   python bin/file_editor.py update-json mybox/config.json "version" "1.2.3"
 """
     print(usage)

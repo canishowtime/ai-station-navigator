@@ -635,6 +635,7 @@ class MCPManager:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                encoding='utf-8',
                 env=test_env,
                 shell=False  # 安全：禁用 shell 防止命令注入
             )

@@ -1,104 +1,104 @@
-# Worker Agent Dispatch Protocol v3.0
+# Worker Agent 调度协议 v3.0
 
-> **Positioning**: Kernel ↔ Worker Agent Communication Contract
-> **Principle**: Idempotent Call + Unified Return + Prevent Duplicate Execution
+> **定位**: Kernel ↔ Worker Agent 的通信契约
+> **原则**: 幂等调用 + 统一返回 + 防重复执行
 
 ---
 
-## 1. Dispatch Protocol
+## 1. 调用规范 (Dispatch Protocol)
 
-### 1.1 Execution Mode Description [P0]
-**Synchronous Execution Architecture**: Worker Agent uses synchronous execution mode, task results obtained directly in `Task` return value.
+### 1.1 执行模式说明 [P0]
+**同步执行架构**：Worker Agent 采用同步执行模式，任务结果直接在 `Task` 返回值中获取。
 
 ```yaml
-# Correct: Process Task return value directly
-result = Task("worker_agent", "List skills", "Execute python bin/skill_manager.py list")
-# Result already in result, no subsequent retrieval needed
+# ✅ 正确：直接处理 Task 返回值
+result = Task("worker_agent", "列出技能", "执行 python bin/skill_manager.py list")
+# → 结果已在 result 中，无需后续检索
 
-# Wrong: Attempt to retrieve with TaskOutput
-TaskOutput(task_id=xxx)  # Sync task has no task_id, will error
+# ❌ 错误：尝试用 TaskOutput 检索
+TaskOutput(task_id=xxx)  # → 同步任务无 task_id，会报错
 ```
 
-### 1.2 Task Tool Signature
+### 1.2 Task 工具签名
 ```
 Task(
   "worker_agent",
-  "<3-5 word task summary>",
-  "Execute python bin/<script> [params]"
+  "<3-5词任务摘要>",
+  "执行 python bin/<脚本> [参数]"
 )
 ```
 
-### 1.3 Idempotency Guarantee [P0-LOCK]
+### 1.3 幂等性保证 [P0-LOCK]
 ```yaml
-# Duplicate Execution Prevention Rules
-Cache Duration: 5 seconds
-Deduplication Key: idempotency_key (string)
-Behavior: Same key returns cached result within 5s
+# 防重复执行规则
+缓存时间: 5秒
+去重键: idempotency_key (字符串)
+行为: 相同键5s内直接返回缓存结果
 
-# Recommended key naming
-- "skill-list"         # List skills
-- "skill-search:<kw>"  # Search skills
-- "scan-skills"        # Scan skills
+# 推荐的 key 命名
+- "skill-list"         # 列出技能
+- "skill-search:<kw>"  # 搜索技能
+- "scan-skills"        # 扫描技能
 ```
 
-### 1.4 Prompt Construction Rules
+### 1.3 Prompt 构建规则
 ```yaml
-# Standard format
-Execute python bin/<script_name> [params...]
+# 标准格式
+执行 python bin/<脚本名> [参数...]
 
-# Examples
-Execute python bin/skill_manager.py list
-Execute python bin/skill_manager.py search markdown
-Execute python bin/skill_scanner.py scan
+# 示例
+执行 python bin/skill_manager.py list
+执行 python bin/skill_manager.py search markdown
+执行 python bin/skill_scanner.py scan
 ```
 
-### 1.5 Pre-dispatch Check [MUST]
-- [ ] Script file exists in `bin/` directory
-- [ ] Operation parameters complete (ask user if missing)
-- [ ] Not code creation task (creating Python scripts prohibited)
-- [ ] Git Bash spec check (disable `> nul`, use `> /dev/null`)
+### 1.4 派发前检查 [MUST]
+- [ ] 脚本文件存在于 `bin/` 目录
+- [ ] 操作参数完整（缺失则询问用户）
+- [ ] 非代码创建任务（禁止创建 Python 脚本）
+- [ ] Git Bash 规范检查（禁用 `> nul`，使用 `> /dev/null`）
 
 ---
 
-## 2. Return Protocol
+## 2. 返回规范 (Return Protocol)
 
-### 2.1 Standard Format
+### 2.1 标准格式
 ```
 <status> worker_agent <summary>
   state: <code> | data: {...} | meta: {...}
 ```
 
-### 2.2 Status Code Definition
-| Status | Icon | Meaning | Usage Scenario |
+### 2.2 状态码定义
+| 状态 | 图标 | 含义 | 使用场景 |
 |:---|:---|:---|:---|
-| `success` | check-icon | Complete success | Script execution completed |
-| `success` | fast-forward-icon | Cache hit | Duplicate call within 5s (idempotent) |
-| `partial` | warning-icon | Partial success | Some tasks completed |
-| `error` | x-icon | Execution failed | Recoverable or unrecoverable error |
+| `success` | ✅ | 完全成功 | 脚本执行完成 |
+| `success` | ⏭️ | 缓存命中 | 5s内重复调用（幂等） |
+| `partial` | ⚠️ | 部分成功 | 部分任务完成 |
+| `error` | ❌ | 执行失败 | 可恢复或不可恢复的错误 |
 
-### 2.3 Standard Return Examples
+### 2.3 标准返回示例
 
 ```yaml
-# Success
-check-icon worker_agent scan completed: 2 added, 3 updated
+# 成功
+✅ worker_agent 扫描完成: 新增 2 个, 更新 3 个
   state: success
   data: {added: ["skill_a","skill_b"], updated: ["skill_c","skill_d","skill_e"], total: 5}
   meta: {agent: worker_agent, time: 0.5, ts: "2025-01-29T10:30:00Z"}
 
-# Cache hit (idempotent)
-fast-forward-icon worker_agent cache hit: using recent result (<5s)
+# 缓存命中（幂等）
+⏭️ worker_agent 缓存命中: 使用最近结果 (<5s)
   state: success
   data: {cached: true, original_result: {total: 5, skills: [...]}}
   meta: {agent: worker_agent, time: 0.01, ts: "2025-01-29T10:30:05Z"}
 
-# Partial success
-warning-icon worker_agent partial completion: 3/5 scripts executed successfully
+# 部分成功
+⚠️ worker_agent 部分完成: 3/5 个脚本执行成功
   state: partial
   data: {succeeded: ["a.py","b.py","c.py"], failed: ["d.py","e.py"]}
   meta: {agent: worker_agent, time: 1.2, ts: "2025-01-29T10:30:00Z"}
 
-# Error
-x-icon worker_agent RuntimeError: Script execution failed
+# 错误
+❌ worker_agent RuntimeError: 脚本执行失败
   state: error
   data: {type: "FileNotFoundError", msg: "bin/script.py not found"}
   meta: {agent: worker_agent, time: 0.1, ts: "2025-01-29T10:30:00Z"}
@@ -106,67 +106,67 @@ x-icon worker_agent RuntimeError: Script execution failed
 
 ---
 
-## 3. Error Type Mapping
+## 3. 错误类型映射
 
-| Error Type | Summary Format | recoverable | Handling Suggestion |
+| 错误类型 | 摘要格式 | recoverable | 处理建议 |
 |:---|:---|:---:|:---|
-| `ScriptNotFound` | Script not found: `<script>` | false | Check script path |
-| `InvalidArgs` | Invalid args: `<reason>` | true | Show script Help |
-| `RuntimeError` | Execution failed: `<stderr snippet>` | null | Judge by specific error |
-| `PermissionDenied` | Permission denied | false | Check file permissions |
+| `ScriptNotFound` | 脚本不存在: `<script>` | false | 检查脚本路径 |
+| `InvalidArgs` | 参数错误: `<reason>` | true | 显示脚本Help |
+| `RuntimeError` | 执行失败: `<stderr片段>` | null | 视具体错误判断 |
+| `PermissionDenied` | 权限不足 | false | 检查文件权限 |
 
 ---
 
-## 4. Special Return Fields
+## 4. 特殊返回字段
 
-### 4.1 LangGraph Interrupt Fallback Mechanism [FALLBACK]
+### 4.1 LangGraph Interrupt 补漏机制 [FALLBACK]
 
-**Trigger Condition**: When Worker returns `state: interrupted`
+**触发条件**：Worker 返回 `state: interrupted` 时
 
-**Main Session Handling Flow**:
+**主会话处理流程**：
 ```yaml
-1. Detect "[INTERRUPT]" marker
-2. Read langgraph_interrupt.json
-3. LLM analysis → {"skill": "keep/uninstall"}
-4. Execute recovery command
+1. 检测 "[INTERRUPT]" 标记
+2. 读取 langgraph_interrupt.json
+3. LLM 分析 → {"skill": "keep/uninstall"}
+4. 执行恢复命令
 ```
 
-**Worker Return Format** (unhandled):
+**Worker 返回格式**（未处理）：
 ```yaml
-pause-icon worker_agent workflow paused: <N> skills need LLM analysis
+⏸️ worker_agent 工作流已暂停: <N> 个技能需 LLM 分析
   state: interrupted
   data: {interrupted_skills: [...], resume_command: "..."}
 ```
 
-**Note**: Worker should prioritize autonomous handling (see `.claude/agents/worker_agent.md`), main session only serves as fallback.
+**注**：Worker 应优先自主处理（见 `.claude/agents/worker_agent.md`），主会话仅作补漏。
 
-### 4.2 analysis_prompt Field
-When output contains `【LLM Secondary Analysis Task】`:
+### 4.2 analysis_prompt 字段
+当输出包含 `【LLM 二次分析任务】` 时：
 ```yaml
 data:
-  analysis_prompt: "<Content requiring LLM secondary analysis>"
+  analysis_prompt: "<需要LLM二次分析的内容>"
 ```
 
-### 4.3 Comparison with Other Agents
+### 4.3 与其他 Agent 对比
 
-| Agent | Responsibility | Exclusive Feature |
+| Agent | 职责 | 专属特性 |
 |:---|:---|:---|
-| **worker_agent** | Execute `bin/` scripts | Idempotency + Interrupt autonomous handling |
-| **skills** | Execute installed skills | Timeout limit |
+| **worker_agent** | 执行 `bin/` 脚本 | 幂等性 + Interrupt 自主处理 |
+| **skills** | 执行已安装技能 | 超时限制 |
 
 ---
 
-## 5. Python Encoding Compatibility [P0]
+## 5. Python 编码兼容性 [P0]
 
-**Root Cause**: Windows Python defaults to GBK encoding, cannot output emoji, causing script crashes.
+**问题根源**: Windows 下 Python 默认使用 GBK 编码，无法输出 emoji，导致脚本崩溃。
 
-**Mandatory Requirement**: All Python scripts must add UTF-8 encoding setting at the beginning:
+**强制要求**: 所有 Python 脚本开头必须添加 UTF-8 编码设置：
 
 ```python
 import sys
 import os
 
-# Windows UTF-8 Compatibility (P0 - All scripts must include)
+# Windows UTF-8 兼容 (P0 - 所有脚本必须包含)
 if sys.platform == 'win32':
     try:
         sys.stdout.reconfigure(encoding='utf-8')
@@ -177,7 +177,7 @@ if sys.platform == 'win32':
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 ```
 
-**Prohibit emoji**: Emoji is prohibited in output information, use ASCII instead:
-- check-icon → `[OK]` / `success:`
-- x-icon → `[ERROR]` / `failed:`
-- warning-icon → `[WARN]` / `warning:`
+**禁止使用 emoji**: 输出信息中禁止使用 emoji，使用 ASCII 替代：
+- `✅` → `[OK]` / `success:`
+- `❌` → `[ERROR]` / `failed:`
+- `⚠️` → `[WARN]` / `warning:`

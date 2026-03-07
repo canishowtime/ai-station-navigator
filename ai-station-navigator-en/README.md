@@ -1,240 +1,239 @@
 # AI Station Navigator
 
-> Navigator Kernel - Claude Agent System Bus and Dispatcher Framework
+> Navigator Kernel - Claude 智能体系统总线与调度器框架
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
 ---
 
-## Introduction
+## 简介
 
-AI Station Navigator is a **production-ready** modular Claude agent framework. It implements skill management, MCP resource integration, and system improvement management through sub-agent collaboration.
+AI Station Navigator 是一个**生产就绪**的模块化 Claude 智能体框架。通过子智能体协作模式实现技能管理、MCP 资源集成和系统改进管理。
 
-### Core Design Philosophy
+### 核心设计理念
 
-> **Minimize State_Gap** - Efficiently transition from current state (S_Current) to target state (S_Target)
+> **最小化 State_Gap** - 从当前状态 (S_Current) 高效到达目标状态 (S_Target)
 
-### Architecture Features
+### 架构特点
 
-- **Three-Layer Architecture**: Kernel (System Bus) + Sub-agents (Specialized Execution) + Tools (Capability Extension)
-- **No Side Effects Principle**: All write operations require explicit authorization
-- **Minimal Output**: Data and state only, no fluff
-- **Session Stickiness**: Subsequent operations of the same task auto-route to the same sub-agent
+- **三层架构**: Kernel (系统总线) + Sub-agents (专业化执行) + Tools (能力扩展)
+- **无副作用原则**: 所有写操作需明确授权
+- **极简输出**: 仅保留数据与状态，拒绝废话
+- **会话粘性**: 同一任务的后续操作自动路由到同一子智能体
 
 ---
 
-## Core Capabilities
+## 核心能力
 
-### Complete Tool Matrix
+### 完整工具矩阵
 
-| Tool | Function | Command |
+| 工具 | 功能 | 命令 |
 |:---|:---|---|
-| **skill_manager** | Skill install/uninstall/search/convert/validate | `python bin/skill_manager.py <cmd>` |
-| **mcp_manager** | MCP server management | `python bin/mcp_manager.py <cmd>` |
-| **improvement_manager** | System improvement management (dual-track) | `python bin/improvement_manager.py <cmd>` |
-| **improvement_checklist** | Improvement completion checklist | `python bin/improvement_checklist.py <cmd>` |
-| **hooks_manager** | System event hooks management | `python bin/hooks_manager.py <cmd>` |
-| **gh_fetch** | GitHub content fetcher (acceleration supported) | `python bin/gh_fetch.py <cmd>` |
+| **skill_manager** | 技能安装/卸载/搜索/转换/验证 | `python bin/skill_manager.py <cmd>` |
+| **mcp_manager** | MCP 服务器管理 | `python bin/mcp_manager.py <cmd>` |
+| **improvement_manager** | 系统改进方案管理 (双轨制) | `python bin/improvement_manager.py <cmd>` |
+| **improvement_checklist** | 改进完成度检查清单 | `python bin/improvement_checklist.py <cmd>` |
+| **hooks_manager** | 系统事件钩子管理 | `python bin/hooks_manager.py <cmd>` |
+| **gh_fetch** | GitHub 内容获取 (支持加速) | `python bin/gh_fetch.py <cmd>` |
 
-### Featured Functions
+### 特色功能
 
-| Feature | Description |
-|:---|:---|
-| **Smart Matching** | Multi-dimensional weighted scoring algorithm, auto-match related skills |
-| **Format Conversion** | Auto-detect and convert non-standard formats to official SKILL.md |
-| **Dual-Track Improvement** | Quick Fix (lightweight) / Full Proposal (complete) mode |
-| **Backup & Rollback** | Auto backup before MCP operations, auto rollback on failure |
-| **Network Acceleration** | Support Git clone and GitHub Raw file acceleration |
-| **Auto Hooks** | Session cleanup, log rotation, disk check automation |
+| 功能 | 说明 |
+|:---|---|
+| **智能匹配** | 多维度加权评分算法，自动匹配相关技能 |
+| **格式转换** | 自动检测并转换非标准格式为官方 SKILL.md |
+| **双轨制改进** | Quick Fix (轻量) / Full Proposal (完整) 模式 |
+| **备份回滚** | MCP 操作前自动备份，失败自动回滚 |
+| **网络加速** | 支持 Git 克隆和 GitHub Raw 文件加速 |
+| **自动 Hooks** | 会话清理、日志轮转、磁盘检查自动化 |
 
 ---
 
-## Directory Structure
+## 目录结构
 
 ```
 project-root/
-├── bin/                     🔒 Core Scripts (Read-only)
-│   ├── skill_manager.py         Skill Manager
-│   ├── mcp_manager.py           MCP Manager
-│   ├── improvement_manager.py   Improvement Manager
-│   ├── improvement_checklist.py Checklist
-│   ├── hooks_manager.py         Hooks Manager
-│   └── gh_fetch.py              GitHub Fetcher
+├── bin/                     🔒 核心脚本 (只读)
+│   ├── skill_manager.py         技能管理器
+│   ├── mcp_manager.py           MCP 管理器
+│   ├── improvement_manager.py   改进管理器
+│   ├── improvement_checklist.py 检查清单
+│   ├── hooks_manager.py         钩子管理器
+│   └── gh_fetch.py              GitHub 获取工具
 │
-├── .claude/                 🟡 System Config/State/Agent Definitions
-│   ├── agents/                  Sub-agent Definitions
-│   │   ├── worker_agent.md          Internal Script Executor
-│   │   └── skills_agent.md          Skill Runtime
-│   ├── skills/              🧪 Installed Skills
-│   │   └── skills.db               TinyDB Unified Data Source
-│   ├── memory/              💾 User Preferences & State
-│   ├── state/               🔄 Runtime State
-│   │   ├── hooks_state.json         Hooks State
-│   │   └── user_choices.json        User Choice Records
-│   └── extensions_config.json    Extension Config
+├── .claude/                 🟡 系统配置/状态/智能体定义
+│   ├── agents/                  子智能体定义
+│   │   ├── worker_agent.md          内部脚本执行器
+│   │   └── skills_agent.md          技能运行时
+│   ├── skills/              🧪 已安装技能
+│   │   └── skills.db               TinyDB 统一数据源
+│   ├── memory/              💾 用户偏好与状态
+│   ├── state/               🔄 运行时状态
+│   │   ├── hooks_state.json         Hooks 状态
+│   │   └── user_choices.json        用户选择记录
+│   └── extensions_config.json    扩展配置
 │
-├── mybox/                   ⚡ Sandbox Environment (Free R/W)
-│   ├── workspace/           ↻ Processing Center
-│   ├── temp/                ✕ Temp Cache
-│   ├── output/              📤 Final Output
-│   ├── lib/                 📚 User Library
-│   └── skills/              Local Skill Testing
+├── mybox/                   ⚡ 沙盒环境 (自由读写)
+│   ├── workspace/           ↻ 处理中心
+│   ├── temp/                ✕ 临时缓存
+│   ├── output/              📤 最终产物
+│   ├── lib/                 📚 用户库
+│   └── skills/              本地技能测试
 │
-├── docs/                    📖 Complete Documentation System
-│   ├── commands.md              Command Registry
-│   ├── filesystem.md            Filesystem Specification
-│   ├── skills-quickstart.md     Skill Quick Start
-│   ├── skill-support.md         Skill Support List
-│   ├── tinydb-schema.md         Database Schema
-│   ├── guides/                  Operation Guides Index
-│   │   ├── README.md                Overview Index
-│   │   ├── skill-manager-guide.md   Skill Management Guide
-│   │   ├── skill-creator-guide.md   Skill Creation Guide
-│   │   ├── mcp-manager-guide.md     MCP Management Guide
-│   │   └── hooks-guide.md           Hooks Guide
+├── docs/                    📖 完整文档体系
+│   ├── commands.md              命令注册表
+│   ├── filesystem.md            文件系统规范
+│   ├── skills-quickstart.md     技能快速入门
+│   ├── skill-support.md         技能支持清单
+│   ├── tinydb-schema.md         数据库模式
+│   ├── guides/                  操作指南索引
+│   │   ├── README.md                总览索引
+│   │   ├── skill-manager-guide.md   技能管理指南
+│   │   ├── skill-creator-guide.md   技能创建指南
+│   │   ├── mcp-manager-guide.md     MCP 管理指南
+│   │   └── hooks-guide.md           Hooks 指南
 │
-├── tests/                   🧪 Test Suite (In Development)
+├── tests/                   🧪 测试套件 (开发中)
 │
-├── CLAUDE.md                📜 Core Protocol (Must Read)
-├── config.json              ⚙️ Network & Proxy Config
-└── requirements.txt         📦 Python Dependencies
+├── CLAUDE.md                📜 核心协议 (必读)
+├── config.json              ⚙️ 网络与代理配置
+└── requirements.txt         📦 Python 依赖
 ```
 
 ---
 
-## Quick Start
+## 快速开始
 
-### 1. Environment Setup
+### 1. 环境准备
 
 ```bash
-# Install dependencies
+# 安装依赖
 pip install -r requirements.txt
 ```
 
-### 2. Core Protocol Reading
+### 2. 核心协议阅读
 
-**Must read `CLAUDE.md` first** - Contains system routing logic, execution flow, and specialized protocols.
+**必须先阅读 `CLAUDE.md`** - 包含系统路由逻辑、执行流程和专用协议。
 
-### 3. Skill Management
+### 3. 技能管理
 
 ```bash
-# View installed skills
+# 查看已安装技能
 python bin/skill_manager.py list
 
-# Install new skill (supports URL/Path/Name)
+# 安装新技能 (支持 URL/Path/Name)
 python bin/skill_manager.py install <source>
 
-# Search skill (smart matching)
+# 搜索技能 (智能匹配)
 python bin/skill_manager.py search <keyword>
 ```
 
-### 4. MCP Server Management
+### 4. MCP 服务器管理
 
 ```bash
-# List available presets
+# 列出可用预设
 python bin/mcp_manager.py list
 
-# Add server (auto-configure permissions)
+# 添加服务器 (自动配置权限)
 python bin/mcp_manager.py add context7
 
-# Test connection
+# 测试连接
 python bin/mcp_manager.py test context7
 ```
 
-### 5. System Improvement
+### 5. 系统改进
 
 ```bash
-# Create full proposal
+# 创建完整方案
 python bin/improvement_manager.py create "Add feature X"
 
-# Create quick fix
+# 创建快速修复
 python bin/improvement_manager.py create "Fix bug Y" --quickfix
 
-# Completion check
+# 完成检查
 python bin/improvement_checklist.py check <id>
 ```
 
 ---
 
-## Documentation Index
+## 文档索引
 
-### Core Documents
+### 核心文档
 
-| Document | Purpose |
-|:---|:---|
-| [`CLAUDE.md`](CLAUDE.md) | **Core Protocol** - System Bus Logic |
-| [`docs/commands.md`](docs/commands.md) | Command Registry - All Available Commands |
-| [`docs/filesystem.md`](docs/filesystem.md) | Filesystem Specification - Permissions & Data Flow |
-| [`docs/guides/README.md`](docs/guides/README.md) | Guides Index - Detailed Operation Guides |
+| 文档 | 用途 |
+|:---|---|
+| [`CLAUDE.md`](CLAUDE.md) | **核心协议** - 系统总线逻辑 |
+| [`docs/commands.md`](docs/commands.md) | 命令注册表 - 所有可用命令 |
+| [`docs/filesystem.md`](docs/filesystem.md) | 文件系统规范 - 权限与数据流 |
+| [`docs/guides/README.md`](docs/guides/README.md) | 指南索引 - 详细操作指南 |
 
-### Specialized Guides
+### 专项指南
 
-| Document | Content |
-|:---|:---|
-| [`docs/skills-quickstart.md`](docs/skills-quickstart.md) | Skill Quick Start |
-| [`docs/tinydb-schema.md`](docs/tinydb-schema.md) | Database Schema Details |
+| 文档 | 内容 |
+|:---|---|
+| [`docs/skills-quickstart.md`](docs/skills-quickstart.md) | 技能快速入门 |
+| [`docs/tinydb-schema.md`](docs/tinydb-schema.md) | 数据库模式详解 |
 
 ---
 
-## System Architecture
+## 系统架构
 
-### Sub-agent Responsibilities
+### 子智能体职责
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Kernel (System Bus)                   │
-│  Perception & Intent Analysis → Routing Strategy →      │
-│  Sub-agent Dispatch                                      │
+│                    Kernel (系统总线)                     │
+│  感知与意图分析 → 路由策略制定 → 子智能体调度          │
 └─────────────────────────────────────────────────────────┘
                           │
           ┌───────────────┼───────────────┐
           ↓               ↓               ↓
 ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
 │   skills    │  │   worker    │  │     mcp     │
-│  Sub-agent  │  │  Sub-agent  │  │  Sub-agent  │
+│  子智能体    │  │  子智能体    │  │  子智能体    │
 │             │  │             │  │             │
-│Skill Runtime│  │Script Exec  │  │MCP Operator │
+│ 技能运行时   │  │ 脚本执行器   │  │ MCP 操作员   │
 │             │  │             │  │             │
-│ - Parse Cmd │  │ - Exec bin/ │  │ - Query     │
-│ - Inject    │  │ - Return    │  │ - Read      │
-│ - Run Cmd   │  │   Results   │  │   Content   │
+│ - 解析指令  │  │ - 执行bin/  │  │ - 资源查询  │
+│ - 注入参数  │  │ - 返回结果  │  │ - 内容读取  │
+│ - 运行命令  │  │             │  │             │
 └─────────────┘  └─────────────┘  └─────────────┘
 ```
 
-### Workflow
+### 工作流程
 
-#### Skill Execution Flow
+#### 技能执行流程
 ```
-User Input Task
+用户输入任务
     ↓
-[skill_manager search] → Smart match related skills
+[skill_manager search] → 智能匹配相关技能
     ↓
-Branch Decision:
-├─ Installed → [skills sub-agent] → Direct execution
-└─ Not Installed → [worker] → skill_manager install → [skills] execute
+分支决策:
+├─ 已安装 → [skills 子智能体] → 直接执行
+└─ 未安装 → [worker] → skill_manager install → [skills] 执行
     ↓
-Record Usage → skills.db
+记录使用情况 → skills.db
 ```
 
-#### Improvement Proposal Flow
+#### 改进方案流程
 ```
-User proposes improvement
+用户提出改进
     ↓
-Complexity Assessment:
-├─ Simple → Quick Fix (3 steps, ~400 tokens)
-└─ Complex → Full Proposal (6 steps, ~1500 tokens)
+复杂度评估:
+├─ 简单 → Quick Fix (3步, ~400 tokens)
+└─ 复杂 → Full Proposal (6步, ~1500 tokens)
     ↓
 [improvement_manager create]
     ↓
-Execute Improvement → [improvement_checklist check]
+执行改进 → [improvement_checklist check]
     ↓
-Complete → Update STATUS.md
+完成 → 更新 STATUS.md
 ```
 
 ---
 
-## Configuration
+## 配置说明
 
 ### config.json
 
@@ -258,173 +257,173 @@ Complete → Update STATUS.md
 }
 ```
 
-### MCP Preset Templates
+### MCP 预设模板
 
-| Preset | Purpose | Documentation |
-|:---|:---|:---|
-| `context7` | Programming library doc query | [Context7](https://context7.com) |
-| `tavily` | Web search & content extraction | [Tavily](https://tavily.com) |
-| `filesystem` | Filesystem access | MCP Built-in |
-| `github` | GitHub repository operations | MCP Built-in |
-| `sqlite` | SQLite database | MCP Built-in |
-| `memory` | Key-value storage | MCP Built-in |
+| 预设 | 用途 | 文档 |
+|:---|:---|---|
+| `context7` | 编程库文档查询 | [Context7](https://context7.com) |
+| `tavily` | 网络搜索与内容提取 | [Tavily](https://tavily.com) |
+| `filesystem` | 文件系统访问 | MCP 内置 |
+| `github` | GitHub 仓库操作 | MCP 内置 |
+| `sqlite` | SQLite 数据库 | MCP 内置 |
+| `memory` | 键值存储 | MCP 内置 |
 
 ---
 
-## Smart Matching Engine
+## 智能匹配引擎
 
-### Matching Algorithm
+### 匹配算法
 
-skill_manager uses multi-dimensional weighted scoring:
+skill_manager 使用多维度加权评分：
 
-| Dimension | Weight | Description |
+| 维度 | 权重 | 说明 |
 |:---|:---|:---|
-| Name Match | 0.30 | Exact/fuzzy match skill name |
-| Tag Match | 0.25 | Tag exact match |
-| Search Index | 0.30 | Predefined keywords |
-| Category Match | 0.15 | Skill category |
-| Chinese Keywords | 0.40 | Chinese user optimization |
-| User Preference | +0.3 | History usage bonus |
+| 名称匹配 | 0.30 | 精确/模糊匹配技能名称 |
+| 标签匹配 | 0.25 | 标签完全匹配 |
+| 搜索索引 | 0.30 | 预定义关键词 |
+| 分类匹配 | 0.15 | 技能类别 |
+| 中文关键词 | 0.40 | 中文用户优化 |
+| 用户偏好 | +0.3 | 历史使用加成 |
 
-### Usage Examples
+### 使用示例
 
 ```bash
-# Search skill (installed + recommended)
-python bin/skill_manager.py search "image processing"
+# 搜索技能 (已安装 + 推荐)
+python bin/skill_manager.py search "图像处理"
 
-# List installed skills
+# 列出已安装技能
 python bin/skill_manager.py list
 ```
 
 ---
 
-## Dual-Track Improvement Mode
+## 双轨制改进模式
 
-### Quick Fix (Lightweight)
+### Quick Fix (轻量级)
 
-**Suitable For**: Bug fixes, documentation updates, minor script adjustments
+**适用**: Bug 修复、文档更新、小型脚本调整
 
-- Token Consumption: ~400 (79% reduction)
-- Steps: 3 steps
-- Check: STATUS.md update only
+- Token 消耗: ~400 (降低 79%)
+- 步骤: 3 步
+- 检查: 仅 STATUS.md 更新
 
-### Full Proposal (Complete Process)
+### Full Proposal (完整流程)
 
-**Suitable For**: Architecture adjustments, new features, system upgrades
+**适用**: 架构调整、新增功能、系统升级
 
-- Token Consumption: ~1500
-- Steps: 6 steps
-- Check: CLI registration + Guide docs + STATUS.md
+- Token 消耗: ~1500
+- 步骤: 6 步
+- 检查: CLI 注册 + 指南文档 + STATUS.md
 
 ---
 
-## Automated Hooks
+## 自动化 Hooks
 
-### Pre-registered Hooks
+### 预注册 Hooks
 
-| Hook | Trigger | Function |
-|:---|:---|:---|
-| `log_rotate` | Session start | Rotate logs (keep 7 days) |
-| `check_disk_space` | Session start | Disk space warning |
-| `cleanup_workspace` | Delivery complete | Cleanup workspace |
-| `cleanup_old_downloads` | Session start | Cleanup downloads older than 7 days |
-| `create_delivery_snapshot` | Delivery complete | Create delivery snapshot |
+| Hook | 触发时机 | 功能 |
+|:---|:---|---|
+| `log_rotate` | 会话开始 | 轮转日志 (保留 7 天) |
+| `check_disk_space` | 会话开始 | 磁盘空间警告 |
+| `cleanup_workspace` | 交付完成 | 清理工作区 |
+| `cleanup_old_downloads` | 会话开始 | 清理 7 天前下载 |
+| `create_delivery_snapshot` | 交付完成 | 创建交付快照 |
 
-### Management
+### 管理
 
 ```bash
-# Manually trigger all Hooks
+# 手动触发所有 Hooks
 python bin/hooks_manager.py execute --force
 
-# Enable/Disable Hook
+# 启用/禁用 Hook
 python bin/hooks_manager.py enable --hook-name log_rotate
 python bin/hooks_manager.py disable --hook-name log_rotate
 ```
 
 ---
 
-## Skill Format Support
+## 技能格式支持
 
-### Supported Formats
+### 支持的格式
 
-| Format | Auto Convert |
+| 格式 | 自动转换 |
 |:---|:---|
-| Official SKILL.md | ✅ Native Support |
-| Claude Code Skills | ✅ Auto Convert |
-| Custom Format | ✅ Extensible |
+| 官方 SKILL.md | ✅ 原生支持 |
+| Claude Code Skills | ✅ 自动转换 |
+| Custom Format | ✅ 可扩展 |
 
-### Skill Structure
+### 技能结构
 
 ```
 skill-name/
-├── SKILL.md              # Skill Definition (Required)
-├── scripts/              # Execution Scripts
-├── references/           # Reference Docs
-└── assets/               # Asset Files
+├── SKILL.md              # 技能定义 (必需)
+├── scripts/              # 执行脚本
+├── references/           # 参考文档
+└── assets/               # 资源文件
 ```
 
 ---
 
-## Data Consistency Guarantee
+## 数据一致性保证
 
-### Axioms
+### 公理
 
-1. **Filesystem = Source of Truth**: Actual skills are based on disk files
-2. **Database = Cache**: Only for accelerating queries or storing metadata
+1. **文件系统 = 真理源**: 实际技能以磁盘文件为准
+2. **数据库 = 缓存**: 仅用于加速查询或存储元数据
 
-### Sync Mechanism
+### 同步机制
 
-- Auto sync skills.db on install/uninstall
-- Auto record user preferences to user_choices.json
-
----
-
-## Test Status
-
-> **In Development** - `tests/` directory pending
-
-### Planned Coverage
-
-- [ ] Unit tests (each bin/ script)
-- [ ] Integration tests (sub-agent collaboration)
-- [ ] End-to-end tests (complete workflows)
-- [ ] Regression tests (improvement proposal validation)
+- 安装/卸载时自动同步 skills.db
+- 用户偏好自动记录到 user_choices.json
 
 ---
 
-## Contributing
+## 测试状态
 
-### Improvement Suggestions
+> **开发中** - `tests/` 目录待完善
 
-Welcome to submit improvement suggestions via `improvement_manager`:
+### 计划覆盖
+
+- [ ] 单元测试 (各 bin/ 脚本)
+- [ ] 集成测试 (子智能体协作)
+- [ ] 端到端测试 (完整工作流)
+- [ ] 回归测试 (改进方案验证)
+
+---
+
+## 贡献指南
+
+### 改进建议
+
+欢迎通过 `improvement_manager` 提出改进建议：
 
 ```bash
 python bin/improvement_manager.py create "Your suggestion"
 ```
 
-### Code Standards
+### 代码规范
 
-- Follow PEP 8
-- Add type annotations
-- Write docstrings
-- Update related guides
+- 遵循 PEP 8
+- 添加类型注解
+- 编写文档字符串
+- 更新相关指南
 
 ---
 
-## License
+## 许可证
 
 MIT License
 
 ---
 
-## Acknowledgments
+## 致谢
 
-This project is based on the following excellent projects:
+本项目基于以下优秀项目：
 
 - [Anthropic Claude Code](https://github.com/anthropics/claude-code) - skill-creator (Apache 2.0)
-- [Model Context Protocol](https://modelcontextprotocol.io/) - MCP Specification
-- [TinyDB](https://tinydb.readthedocs.io/) - Lightweight Database
+- [Model Context Protocol](https://modelcontextprotocol.io/) - MCP 规范
+- [TinyDB](https://tinydb.readthedocs.io/) - 轻量级数据库
 
 ---
 
-**Last Updated**: 2026-01-28 | **Version**: v2.6
+**最后更新**: 2026-01-28 | **版本**: v2.6

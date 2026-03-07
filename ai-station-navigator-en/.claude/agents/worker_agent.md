@@ -1,6 +1,6 @@
 ---
 name: worker_agent
-description: 内部脚本执行器。专用于执行 bin/ 目录下的 Python 维护脚本（如扫描、管理、统计）。触发：执行脚本 / 运行 / worker。
+description: "Internal script executor. Specializes in executing Python maintenance scripts in the bin/ directory (e.g., scanning, management, statistics). Triggered by: execute script / run / worker."
 color: green
 ---
 # Worker Agent (内部脚本执行器)

@@ -26,6 +26,10 @@
 
 ** ✅ Agent Context Optimization | ✅ App Store-style Skill Management | ✅ Excellent UI | ✅ Sandbox Isolation | ✅ Skills Security Scanning | ✅ Modular Architecture**
 
+
+https://github.com/user-attachments/assets/248fea17-4de9-4f6f-9d54-ea7c4e8ffc9c
+
+
 ---
 
 ## 🎯 Core Design Philosophy: AI Workstation Architecture
@@ -179,6 +183,10 @@ Here are some GitHub projects collected for testing: [View Skills Categories](sk
 **AI Station Navigator** 是一款基于 Claude Code 引擎构建的模块化 AI 工作站。它模仿计算机组成原理，将繁杂的 AI 任务路由至子智能体（Sub-Agents）内并匹配相应的skills执行。项目集成了“应用商店式”技能管理与沙盒化执行环境，配合全绿色的免安装运行环境，旨在为用户提供一个解压即用、性能稳定、无限扩展的个人 AI 智慧中枢。
 
 ** ✅ 智能体上下文优化 | ✅ 应用商店式技能管理 | ✅ 良好的UI | ✅ 沙盒隔离 | ✅ Skills安全扫描 | ✅ 模块化架构**
+
+
+https://github.com/user-attachments/assets/eaead2e4-fee9-4439-b0a4-1cb52d5ccf57
+
 
 ---
 
